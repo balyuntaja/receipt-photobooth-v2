@@ -11,15 +11,22 @@ use Illuminate\Support\Str;
 
 class BoothController extends Controller
 {
+    /**
+     * Start kiosk session: validate project, create session, return kiosk view.
+     */
     public function start(Project $project)
     {
         // 1️⃣ Validasi project
         abort_unless($project->is_active, 403);
         abort_unless($project->user_id !== null, 404);
 
-        // 2️⃣ Ambil setting pricing
-        $setting = $project->setting;
-        abort_if(!$setting, 403, 'Project not configured');
+        // 2️⃣ Ambil atau buat setting pricing
+        $setting = $project->setting ?? $project->setting()->create([
+            'price_per_session' => 0,
+            'copies' => 1,
+            'max_retakes' => 3,
+            'auto_print' => true,
+        ]);
 
         // 3️⃣ Buat session
         $session = BoothSession::create([
@@ -37,19 +44,41 @@ class BoothController extends Controller
             'status' => TransactionStatusEnum::PAID,
         ]);
 
+        // 5️⃣ Load frames aktif
         $frames = $project->frames()
             ->wherePivot('is_active', true)
             ->where('frames.is_active', true)
             ->get();
 
-        // 5️⃣ Masuk kiosk
+        // 6️⃣ Load welcome screen components (ordered by sort_order)
+        $welcomeComponents = $project->welcomeScreenComponents()
+            ->ordered()
+            ->get();
+
+        // 7️⃣ Return kiosk view with all data for JS
         return view('booth.kiosk', [
             'project' => $project,
             'session' => $session,
             'setting' => $setting,
             'frames' => $frames,
+            'welcomeComponents' => $welcomeComponents,
             'initialState' => 'IDLE',
         ]);
+    }
 
+    /**
+     * QR / softfile page: view captured photos for a session.
+     * Public route (no auth) - users arrive via QR code.
+     */
+    public function result(BoothSession $session)
+    {
+        $project = $session->project;
+        $media = $session->media()->get();
+
+        return view('booth.result', [
+            'project' => $project,
+            'session' => $session,
+            'media' => $media,
+        ]);
     }
 }

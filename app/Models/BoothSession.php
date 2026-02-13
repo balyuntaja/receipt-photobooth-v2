@@ -18,6 +18,7 @@ class BoothSession extends Model
     protected $fillable = [
         'id',
         'project_id',
+        'frame_id',
         'user_id',
         'started_at',
         'ended_at',

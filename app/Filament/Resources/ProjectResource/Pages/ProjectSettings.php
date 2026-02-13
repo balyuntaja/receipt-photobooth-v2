@@ -11,6 +11,7 @@ use Filament\Resources\Pages\Page;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
 
 class ProjectSettings extends Page implements HasForms
 {
@@ -64,7 +65,6 @@ class ProjectSettings extends Page implements HasForms
             $record->only([
                 'name',
                 'description',
-                'cover_image',
                 'is_active',
             ])
         );
@@ -107,12 +107,6 @@ class ProjectSettings extends Page implements HasForms
                     ->label('Description')
                     ->rows(3),
 
-                Forms\Components\FileUpload::make('cover_image')
-                    ->label('Cover Image')
-                    ->image()
-                    ->directory('project-covers')
-                    ->imagePreviewHeight(180),
-
                 Forms\Components\Toggle::make('is_active')
                     ->label('Project Active'),
             ])
@@ -122,11 +116,6 @@ class ProjectSettings extends Page implements HasForms
     public function save(): void
     {
         $this->record->update($this->form->getState());
-
-        Notification::make()
-            ->title('Project updated')
-            ->success()
-            ->send();
     }
 
     /**
@@ -168,11 +157,6 @@ class ProjectSettings extends Page implements HasForms
             ['project_id' => $this->record->id],
             $this->pricing
         );
-
-        Notification::make()
-            ->title('Pricing updated')
-            ->success()
-            ->send();
     }
 
     /**
@@ -187,7 +171,7 @@ class ProjectSettings extends Page implements HasForms
                 Forms\Components\CheckboxList::make('frames')
                     ->label('Available Frames')
                     ->options(
-                        Frame::where('user_id', auth()->id())
+                        Frame::where('user_id', Auth::id())
                             ->where('is_active', true)
                             ->pluck('name', 'id')
                     )
@@ -206,9 +190,30 @@ class ProjectSettings extends Page implements HasForms
                 ])
                 ->toArray()
         );
+    }
+
+    /**
+     * Frames yang bisa dipilih untuk project (untuk tampilan dengan preview).
+     */
+    public function getAvailableFrames()
+    {
+        return Frame::where('user_id', Auth::id())
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Save all sections (General, Pricing, Frames) at once.
+     */
+    public function saveAll(): void
+    {
+        $this->save();
+        $this->savePricing();
+        $this->saveFrames();
 
         Notification::make()
-            ->title('Frames updated')
+            ->title('Settings saved')
             ->success()
             ->send();
     }

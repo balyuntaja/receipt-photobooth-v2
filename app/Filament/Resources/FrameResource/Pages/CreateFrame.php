@@ -9,4 +9,9 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateFrame extends CreateRecord
 {
     protected static string $resource = FrameResource::class;
+
+    protected function getRedirectUrl(): string
+    {
+        return FrameResource::getUrl('layout', ['record' => $this->record]);
+    }
 }

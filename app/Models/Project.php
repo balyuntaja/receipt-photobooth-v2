@@ -11,9 +11,11 @@ class Project extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'user_id',
         'name',
         'description',
         'cover_image',
+        'welcome_background_color',
         'is_active',
     ];
 
@@ -41,6 +43,21 @@ class Project extends Model
             ->withTimestamps();
     }
 
+    /**
+     * Get the welcome screen components for this project.
+     */
+    public function welcomeScreenComponents()
+    {
+        return $this->hasMany(WelcomeScreenComponent::class)->ordered();
+    }
 
-
+    /**
+     * Get the background component for welcome screen (only one allowed).
+     */
+    public function welcomeScreenBackground()
+    {
+        return $this->hasOne(WelcomeScreenComponent::class)
+            ->where('type', 'background')
+            ->latest();
+    }
 }

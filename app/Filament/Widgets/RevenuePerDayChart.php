@@ -7,6 +7,7 @@ use App\Enums\TransactionStatusEnum;
 use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class RevenuePerDayChart extends ChartWidget
 {
@@ -26,7 +27,7 @@ class RevenuePerDayChart extends ChartWidget
     protected function getData(): array
     {
         $days = 14;
-        $userId = auth()->id();
+        $userId = Auth::id();
         $today = Carbon::today();
 
         $data = Transaction::query()

@@ -9,6 +9,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\Layout\View;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -44,22 +45,30 @@ class FrameResource extends Resource
                 ->acceptedFileTypes(['image/png'])
                 ->helperText('PNG transparan'),
 
-            Forms\Components\Toggle::make('is_active'),
+            Forms\Components\Select::make('is_active')
+                ->label('Status')
+                ->options([
+                    1 => 'Public',
+                    0 => 'Private',
+                ])
+                ->default(1)
+                ->required(),
         ]);
     }
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
-            Tables\Columns\ImageColumn::make('preview_image')
-                ->label('Preview'),
-
-            Tables\Columns\TextColumn::make('name')
-                ->searchable(),
-
-            Tables\Columns\IconColumn::make('is_active')
-                ->boolean(),
-        ]);
+        return $table
+            ->columns([
+                View::make('filament.frames.frame-card'),
+            ])
+            ->contentGrid([
+                'md' => 2,
+                'xl' => 3,
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->recordUrl(null)
+            ->recordAction(null);
     }
 
     public static function getPages(): array
@@ -68,6 +77,7 @@ class FrameResource extends Resource
             'index' => Pages\ListFrames::route('/'),
             'create' => Pages\CreateFrame::route('/create'),
             'edit' => Pages\EditFrame::route('/{record}/edit'),
+            'layout' => Pages\FrameLayout::route('/{record}/layout'),
         ];
     }
 }

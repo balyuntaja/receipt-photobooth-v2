@@ -1,0 +1,220 @@
+/**
+ * Kiosk Base Styles
+ * ==================
+ * Base styles for the photobooth kiosk interface.
+ * This file handles:
+ * - Screen container layout
+ * - Common utilities
+ * - Modal styles
+ * - Button animations
+ */
+
+/* ===========================
+   BASE LAYOUT
+   =========================== */
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    background-color: #fff;
+    overflow: hidden;
+}
+
+/* Screen container: full viewport */
+.booth-screen {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Non-active screens are hidden */
+.booth-screen.hidden {
+    display: none;
+}
+
+/* ===========================
+   SCREEN VARIANTS
+   =========================== */
+
+/* White background screens (capture, preview, print, etc.) */
+.booth-screen-white {
+    background-color: #fff;
+    color: #111;
+}
+
+/* Dark background screens */
+.booth-screen-dark {
+    background-color: #1a1a1a;
+    color: #fff;
+}
+
+/* ===========================
+   MODAL STYLES
+   =========================== */
+
+.booth-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.booth-modal-backdrop.hidden {
+    display: none;
+}
+
+.booth-modal {
+    background-color: #fff;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    max-width: 90%;
+    width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Dark mode modal */
+.booth-modal-dark {
+    background-color: #1f2937;
+    color: #fff;
+}
+
+/* ===========================
+   BUTTON STYLES
+   =========================== */
+
+.booth-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    border: none;
+    outline: none;
+}
+
+.booth-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.booth-btn-primary {
+    background-color: #3b82f6;
+    color: #fff;
+}
+
+.booth-btn-primary:hover:not(:disabled) {
+    background-color: #2563eb;
+}
+
+.booth-btn-secondary {
+    background-color: #6b7280;
+    color: #fff;
+}
+
+.booth-btn-secondary:hover:not(:disabled) {
+    background-color: #4b5563;
+}
+
+.booth-btn-white {
+    background-color: #fff;
+    color: #111;
+}
+
+.booth-btn-white:hover:not(:disabled) {
+    background-color: #f3f4f6;
+}
+
+/* ===========================
+   ICON BUTTONS
+   =========================== */
+
+.booth-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    transition: opacity 0.15s ease;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: #fff;
+}
+
+.booth-icon-btn:hover {
+    opacity: 0.7;
+}
+
+/* ===========================
+   ANIMATIONS
+   =========================== */
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(-5%);
+        animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+    50% {
+        transform: translateY(0);
+        animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+}
+
+.animate-bounce {
+    animation: bounce 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* ===========================
+   UTILITIES
+   =========================== */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}

@@ -6,6 +6,7 @@ use App\Models\Transaction;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Support\Facades\Auth;
 
 class RecentActivityWidget extends BaseWidget
 {
@@ -28,9 +29,6 @@ class RecentActivityWidget extends BaseWidget
             // Tidak ada action di header (opsional, tapi bersih)
             ->headerActions([])
 
-            // Global search (render di kanan judul)
-            ->searchable()
-
             // Query user-scoped (AMAN SAAS)
             ->query(
                 Transaction::query()
@@ -38,7 +36,7 @@ class RecentActivityWidget extends BaseWidget
                     ->whereHas(
                         'session.project',
                         fn($query) =>
-                        $query->where('user_id', auth()->id())
+                        $query->where('user_id', Auth::id())
                     )
                     ->latest()
                     ->limit(10)
@@ -47,8 +45,7 @@ class RecentActivityWidget extends BaseWidget
             // Kolom table
             ->columns([
                 Tables\Columns\TextColumn::make('session.project.name')
-                    ->label('Project')
-                    ->searchable(),
+                    ->label('Project'),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Time')

@@ -10,13 +10,8 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
 use Filament\Tables;
+use Filament\Tables\Columns\Layout\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Columns\Layout\Grid;
-use Filament\Tables\Columns\Layout\Stack;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Actions\Action;
 
 class ProjectResource extends Resource
 {
@@ -54,56 +49,15 @@ class ProjectResource extends Resource
     {
         return $table
             ->columns([
-                Grid::make()
-                    ->columns(3)
-                    ->schema([
-                        Stack::make([
-                            ImageColumn::make('cover_image')
-                                ->width('100%')
-                                ->height('auto')
-                                ->extraImgAttributes([
-                                    'class' => 'w-full aspect-video object-cover rounded-lg',
-                                ]),
-
-                            TextColumn::make('name')
-                                ->weight('bold')
-                                ->size('lg'),
-
-                            TextColumn::make('updated_at')
-                                ->label('Last updated')
-                                ->since(),
-                        ]),
-                    ]),
+                View::make('filament.projects.project-card'),
             ])
-            ->actions([
-                // 🔹 BUKA → KIOSK MODE
-                Action::make('open')
-                    ->label('Buka')
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->color('warning')
-                    ->url(fn(Project $record) => route('booth.start', $record))
-                    ->openUrlInNewTab(),
-
-                // 🔹 UBAH → PROJECT SETTINGS
-                Action::make('settings')
-                    ->label('Ubah')
-                    ->icon('heroicon-o-pencil-square')
-                    ->color('primary')
-                    ->url(
-                        fn(Project $record) =>
-                        route('filament.admin.resources.projects.settings', $record)
-                    ),
-
-                // 🔹 HAPUS
-                Tables\Actions\DeleteAction::make()
-                    ->label('Hapus'),
-            ])
-
             ->contentGrid([
                 'md' => 2,
                 'xl' => 3,
             ])
-            ->paginated(false);
+            ->paginated(false)
+            ->recordUrl(null)
+            ->recordAction(null);
     }
 
 
@@ -121,6 +75,7 @@ class ProjectResource extends Resource
             'create' => Pages\CreateProject::route('/create'),
             'edit' => Pages\EditProject::route('/{record}/edit'),
             'settings' => Pages\ProjectSettings::route('/{record}/settings'),
+            'welcome-screen' => Pages\WelcomeScreen::route('/{record}/welcome-screen'),
         ];
     }
 }

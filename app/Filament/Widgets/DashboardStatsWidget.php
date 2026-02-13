@@ -9,6 +9,7 @@ use App\Enums\TransactionStatusEnum;
 use App\Enums\SessionStatusEnum;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardStatsWidget extends StatsOverviewWidget
 {
@@ -16,7 +17,7 @@ class DashboardStatsWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $userId = auth()->id();
+        $userId = Auth::id();
 
         $sessionsToday = BoothSession::whereDate('created_at', today())
             ->whereHas('project', fn ($q) => $q->where('user_id', $userId))

@@ -12,6 +12,12 @@ class Frame extends Model
         'preview_image',
         'frame_file',
         'is_active',
+        'photo_slots',
+    ];
+
+    protected $casts = [
+        'photo_slots' => 'array',
+        'is_active' => 'boolean',
     ];
 
     public function user()
