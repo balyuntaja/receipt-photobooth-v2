@@ -1,7 +1,9 @@
 @php
     $record = $getRecord();
     $coverUrl = $record->cover_image
-        ? \Illuminate\Support\Facades\Storage::disk('public')->url($record->cover_image)
+        ? ((strpos($record->cover_image, 'http') === 0)
+            ? $record->cover_image
+            : \Illuminate\Support\Facades\Storage::disk('public')->url($record->cover_image))
         : null;
 @endphp
 

@@ -8,6 +8,8 @@ use App\Models\ProjectSetting;
 use App\Models\User;
 use App\Models\WelcomeScreenComponent;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class UserWithDefaultsSeeder extends Seeder
 {
@@ -40,15 +42,51 @@ class UserWithDefaultsSeeder extends Seeder
     }
 
     /**
+     * Download file from URL to storage if not exists.
+     */
+    private function ensureFileFromUrl(string $url, string $storagePath): string
+    {
+        $fullPath = storage_path('app/public/' . $storagePath);
+        $dir = dirname($fullPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        
+        if (!file_exists($fullPath)) {
+            try {
+                $response = Http::timeout(30)->get($url);
+                if ($response->successful()) {
+                    file_put_contents($fullPath, $response->body());
+                } else {
+                    // If download fails, return URL instead
+                    return $url;
+                }
+            } catch (\Exception $e) {
+                // If download fails, return URL instead
+                return $url;
+            }
+        }
+        
+        return $storagePath;
+    }
+
+    /**
      * Seed 3 template frames (dengan slot foto) dan 1 default project untuk user.
      */
     public function seedDefaultFramesAndProject(User $user): void
     {
         $baseUrl = env('APP_URL', 'https://receipt.photomate.id');
+        
+        // Download template frames if not exists
+        $template1Path = $this->ensureFileFromUrl($baseUrl . '/template-frame/template-1.png', 'template-frame/template-1.png');
+        $template2Path = $this->ensureFileFromUrl($baseUrl . '/template-frame/template-2.png', 'template-frame/template-2.png');
+        $template3Path = $this->ensureFileFromUrl($baseUrl . '/template-frame/template-3.png', 'template-frame/template-3.png');
+        $generalHomescreenPath = $this->ensureFileFromUrl($baseUrl . '/general_homescreen.png', 'general_homescreen.png');
+        
         $templateFrames = [
-            ['name' => 'Template 1', 'file' => $baseUrl . '/template-frame/template-1.png', 'key' => 'template-1'],
-            ['name' => 'Template 2', 'file' => $baseUrl . '/template-frame/template-2.png', 'key' => 'template-2'],
-            ['name' => 'Template 3', 'file' => $baseUrl . '/template-frame/template-3.png', 'key' => 'template-3'],
+            ['name' => 'Template 1', 'file' => $template1Path, 'key' => 'template-1'],
+            ['name' => 'Template 2', 'file' => $template2Path, 'key' => 'template-2'],
+            ['name' => 'Template 3', 'file' => $template3Path, 'key' => 'template-3'],
         ];
 
         $allSlots = self::templatePhotoSlots();
@@ -83,7 +121,7 @@ class UserWithDefaultsSeeder extends Seeder
             ],
             [
                 'description' => 'Project default photobooth',
-                'cover_image' => 'general_homescreen.png',
+                'cover_image' => $generalHomescreenPath,
                 'is_active' => true,
             ]
         );
@@ -95,7 +133,7 @@ class UserWithDefaultsSeeder extends Seeder
                 'type' => 'background',
             ],
             [
-                'content' => ['path' => 'general_homescreen.png'],
+                'content' => ['path' => $generalHomescreenPath],
                 'sort_order' => 0,
             ]
         );

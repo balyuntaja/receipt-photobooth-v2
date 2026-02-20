@@ -405,9 +405,13 @@
                                         $imgWidthPx = ($comp['content']['width'] ?? 'auto') === 'custom'
                                             ? (int) ($comp['content']['customWidth'] ?? 200)
                                             : null;
+                                        $imgPath = $comp['content']['path'];
+                                        $imgUrl = (strpos($imgPath, 'http') === 0) 
+                                            ? $imgPath 
+                                            : Storage::disk('public')->url($imgPath);
                                     @endphp
                                     <img
-                                        src="{{ Storage::disk('public')->url($comp['content']['path']) }}"
+                                        src="{{ $imgUrl }}"
                                         alt="Image"
                                         class="pointer-events-none max-h-full w-auto object-contain"
                                         @if ($imgWidthPx) width="{{ $imgWidthPx }}" @endif

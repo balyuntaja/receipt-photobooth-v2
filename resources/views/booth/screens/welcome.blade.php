@@ -25,8 +25,14 @@
 >
     {{-- Background Layer --}}
     @if ($hasBackground)
+        @php
+            $bgPath = $backgroundComponent->content['path'];
+            $bgUrl = (strpos($bgPath, 'http') === 0) 
+                ? $bgPath 
+                : Storage::disk('public')->url($bgPath);
+        @endphp
         <img
-            src="{{ Storage::disk('public')->url($backgroundComponent->content['path']) }}"
+            src="{{ $bgUrl }}"
             alt="Background"
             class="welcome-background"
         />
@@ -123,9 +129,13 @@
                             $imgWidthPx = ($component->content['width'] ?? 'auto') === 'custom'
                                 ? (int) ($component->content['customWidth'] ?? 200)
                                 : null;
+                            $imgPath = $component->content['path'];
+                            $imgUrl = (strpos($imgPath, 'http') === 0) 
+                                ? $imgPath 
+                                : Storage::disk('public')->url($imgPath);
                         @endphp
                         <img
-                            src="{{ Storage::disk('public')->url($component->content['path']) }}"
+                            src="{{ $imgUrl }}"
                             alt="Welcome Image"
                             class="welcome-image"
                             @if ($imgWidthPx) width="{{ $imgWidthPx }}" @endif

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ProjectResource\Pages;
 use App\Models\Frame;
 use App\Filament\Resources\ProjectResource;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Http;
 
 class CreateProject extends CreateRecord
 {
@@ -17,6 +18,35 @@ class CreateProject extends CreateRecord
         return $data;
     }
 
+    /**
+     * Download file from URL to storage if not exists.
+     */
+    private function ensureFileFromUrl(string $url, string $storagePath): string
+    {
+        $fullPath = storage_path('app/public/' . $storagePath);
+        $dir = dirname($fullPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        
+        if (!file_exists($fullPath)) {
+            try {
+                $response = Http::timeout(30)->get($url);
+                if ($response->successful()) {
+                    file_put_contents($fullPath, $response->body());
+                } else {
+                    // If download fails, return URL instead
+                    return $url;
+                }
+            } catch (\Exception $e) {
+                // If download fails, return URL instead
+                return $url;
+            }
+        }
+        
+        return $storagePath;
+    }
+
     protected function afterCreate(): void
     {
         $this->record->setting()->create([
@@ -27,15 +57,17 @@ class CreateProject extends CreateRecord
         ]);
 
         // Default cover image for new projects
-        $this->record->update(['cover_image' => 'general_homescreen.png']);
+        $baseUrl = config('app.url', 'https://receipt.photomate.id');
+        $generalHomescreenPath = $this->ensureFileFromUrl($baseUrl . '/general_homescreen.png', 'general_homescreen.png');
+        $this->record->update(['cover_image' => $generalHomescreenPath]);
 
         // Default frame using template-frame from production URL
-        $baseUrl = config('app.url', 'https://receipt.photomate.id');
+        $template1Path = $this->ensureFileFromUrl($baseUrl . '/template-frame/template-1.png', 'template-frame/template-1.png');
         $defaultFrame = Frame::create([
             'user_id' => auth()->id(),
             'name' => 'Default Frame',
-            'preview_image' => $baseUrl . '/template-frame/template-1.png',
-            'frame_file' => $baseUrl . '/template-frame/template-1.png',
+            'preview_image' => $template1Path,
+            'frame_file' => $template1Path,
             'is_active' => true,
         ]);
 

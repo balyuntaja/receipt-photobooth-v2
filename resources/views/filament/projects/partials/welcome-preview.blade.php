@@ -19,8 +19,14 @@
     <div class="welcome-preview-inner" style="width: 1920px; height: 1080px; transform: scale(0.20833); transform-origin: 0 0; position: relative;">
         <div style="<?php echo e($bgLayerStyle); ?>">
             @if ($hasBackground)
+                @php
+                    $bgPath = $backgroundComponent->content['path'];
+                    $bgUrl = (strpos($bgPath, 'http') === 0) 
+                        ? $bgPath 
+                        : Storage::disk('public')->url($bgPath);
+                @endphp
                 <img
-                    src="{{ Storage::disk('public')->url($backgroundComponent->content['path']) }}"
+                    src="{{ $bgUrl }}"
                     alt=""
                     style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;"
                 />
@@ -75,9 +81,15 @@
                         </p>
                     </div>
                 @elseif ($component->type === 'image' && isset($component->content['path']))
+                    @php
+                        $imgPath = $component->content['path'];
+                        $imgUrl = (strpos($imgPath, 'http') === 0) 
+                            ? $imgPath 
+                            : Storage::disk('public')->url($imgPath);
+                    @endphp
                     <div style="<?php echo e($posStyle); ?>">
                         <img
-                            src="{{ Storage::disk('public')->url($component->content['path']) }}"
+                            src="{{ $imgUrl }}"
                             alt=""
                             style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 0.5rem;"
                         />
