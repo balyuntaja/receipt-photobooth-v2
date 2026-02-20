@@ -29,12 +29,13 @@ class CreateProject extends CreateRecord
         // Default cover image for new projects
         $this->record->update(['cover_image' => 'general_homescreen.png']);
 
-        // Default frame using template-frame from storage
+        // Default frame using template-frame from production URL
+        $baseUrl = config('app.url', 'https://receipt.photomate.id');
         $defaultFrame = Frame::create([
             'user_id' => auth()->id(),
             'name' => 'Default Frame',
-            'preview_image' => 'template-frame/template-1.png',
-            'frame_file' => 'template-frame/template-1.png',
+            'preview_image' => $baseUrl . '/template-frame/template-1.png',
+            'frame_file' => $baseUrl . '/template-frame/template-1.png',
             'is_active' => true,
         ]);
 

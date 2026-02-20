@@ -28,7 +28,15 @@
     data-update-session-url="{{ route('booth.session.update', $session) }}"
     data-save-media-url="{{ route('booth.session.media', $session) }}"
     data-result-url="{{ url(route('booth.result', $session)) }}"
-    data-frames="{{ json_encode($framesForKiosk ?? $frames->map(fn ($f) => ['id' => $f->id, 'name' => $f->name, 'preview' => asset('storage/' . $f->preview_image), 'frame_file' => asset('storage/' . $f->frame_file), 'photo_slots' => $f->photo_slots ?? [], 'template_width' => 1920, 'template_height' => 1080])->values()) }}"
+    data-frames="{{ json_encode($framesForKiosk ?? $frames->map(function ($f) {
+        $preview = (strpos($f->preview_image ?? '', 'http') === 0) 
+            ? $f->preview_image 
+            : asset('storage/' . $f->preview_image);
+        $frameFile = (strpos($f->frame_file ?? '', 'http') === 0) 
+            ? $f->frame_file 
+            : asset('storage/' . $f->frame_file);
+        return ['id' => $f->id, 'name' => $f->name, 'preview' => $preview, 'frame_file' => $frameFile, 'photo_slots' => $f->photo_slots ?? [], 'template_width' => 1920, 'template_height' => 1080];
+    })->values()) }}"
     data-setting="{{ json_encode(['copies' => $setting->copies ?? 1, 'max_retakes' => $setting->max_retakes ?? 3, 'countdown_seconds' => $setting->countdown_seconds ?? 3]) }}"
     data-copy-price-options="{{ json_encode($copyPriceOptions ?? [1 => $pricePerSession ?? 0]) }}">
 

@@ -1,5 +1,9 @@
 @php
-    $frameFile = $record->frame_file ? asset('storage/' . $record->frame_file) : null;
+    $frameFile = $record->frame_file 
+        ? ((strpos($record->frame_file, 'http') === 0) 
+            ? $record->frame_file 
+            : asset('storage/' . $record->frame_file))
+        : null;
 @endphp
 
 <div

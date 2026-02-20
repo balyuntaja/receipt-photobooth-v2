@@ -24,7 +24,7 @@
                     {{-- 8cm x 11cm aspect ratio (8:11) - preview tidak terpotong --}}
                     <span class="kiosk-frame-card__image-wrapper mb-2 flex aspect-8/11 w-full items-center justify-center overflow-hidden rounded-xl">
                         <img
-                            src="{{ asset('storage/' . $frame->preview_image) }}"
+                            src="{{ (strpos($frame->preview_image ?? '', 'http') === 0) ? $frame->preview_image : asset('storage/' . $frame->preview_image) }}"
                             alt="{{ $frame->name }}"
                             class="h-full w-full object-contain"
                             loading="lazy"

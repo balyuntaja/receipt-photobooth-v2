@@ -54,7 +54,9 @@
                         @foreach ($availableFrames as $frame)
                             @php
                                 $previewUrl = $frame->preview_image
-                                    ? asset('storage/' . $frame->preview_image)
+                                    ? ((strpos($frame->preview_image, 'http') === 0)
+                                        ? $frame->preview_image
+                                        : asset('storage/' . $frame->preview_image))
                                     : null;
                                 $isChecked = in_array((string) $frame->id, $this->frames ?? [], true)
                                     || in_array($frame->id, $this->frames ?? [], true);

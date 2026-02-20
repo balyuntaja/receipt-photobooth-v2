@@ -64,19 +64,33 @@ class BoothController extends Controller
         $framesForKiosk = $frames->map(function ($f) {
             $tw = 1920;
             $th = 1080;
-            $path = storage_path('app/public/' . $f->frame_file);
-            if (is_file($path)) {
-                $size = @getimagesize($path);
-                if ($size) {
-                    $tw = (int) $size[0];
-                    $th = (int) $size[1];
+            
+            // Handle both file paths and full URLs
+            $frameFileUrl = (strpos($f->frame_file, 'http') === 0)
+                ? $f->frame_file
+                : asset('storage/' . $f->frame_file);
+            
+            $previewUrl = (strpos($f->preview_image, 'http') === 0)
+                ? $f->preview_image
+                : asset('storage/' . $f->preview_image);
+            
+            // Try to get image size (only for local files)
+            if (strpos($f->frame_file, 'http') !== 0) {
+                $path = storage_path('app/public/' . $f->frame_file);
+                if (is_file($path)) {
+                    $size = @getimagesize($path);
+                    if ($size) {
+                        $tw = (int) $size[0];
+                        $th = (int) $size[1];
+                    }
                 }
             }
+            
             return [
                 'id' => $f->id,
                 'name' => $f->name,
-                'preview' => asset('storage/' . $f->preview_image),
-                'frame_file' => asset('storage/' . $f->frame_file),
+                'preview' => $previewUrl,
+                'frame_file' => $frameFileUrl,
                 'photo_slots' => $f->photo_slots ?? [],
                 'template_width' => $tw,
                 'template_height' => $th,

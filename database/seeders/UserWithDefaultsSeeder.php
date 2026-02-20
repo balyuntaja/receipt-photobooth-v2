@@ -44,10 +44,11 @@ class UserWithDefaultsSeeder extends Seeder
      */
     public function seedDefaultFramesAndProject(User $user): void
     {
+        $baseUrl = env('APP_URL', 'https://receipt.photomate.id');
         $templateFrames = [
-            ['name' => 'Template 1', 'file' => 'template-frame/template-1.png', 'key' => 'template-1'],
-            ['name' => 'Template 2', 'file' => 'template-frame/template-2.png', 'key' => 'template-2'],
-            ['name' => 'Template 3', 'file' => 'template-frame/template-3.png', 'key' => 'template-3'],
+            ['name' => 'Template 1', 'file' => $baseUrl . '/template-frame/template-1.png', 'key' => 'template-1'],
+            ['name' => 'Template 2', 'file' => $baseUrl . '/template-frame/template-2.png', 'key' => 'template-2'],
+            ['name' => 'Template 3', 'file' => $baseUrl . '/template-frame/template-3.png', 'key' => 'template-3'],
         ];
 
         $allSlots = self::templatePhotoSlots();
