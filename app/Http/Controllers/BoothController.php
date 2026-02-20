@@ -7,6 +7,7 @@ use App\Models\BoothSession;
 use App\Models\Transaction;
 use App\Enums\SessionStatusEnum;
 use App\Enums\TransactionStatusEnum;
+use App\Services\SettlementService;
 use Illuminate\Support\Str;
 
 class BoothController extends Controller
@@ -25,6 +26,7 @@ class BoothController extends Controller
             'price_per_session' => 0,
             'copies' => 1,
             'max_retakes' => 3,
+            'countdown_seconds' => 3,
             'auto_print' => true,
         ]);
 
@@ -36,34 +38,74 @@ class BoothController extends Controller
             'started_at' => now(),
         ]);
 
-        // 4️⃣ Buat transaksi (sementara PAID)
-        Transaction::create([
-            'id' => uniqid('trx_'),
-            'session_id' => $session->id,
-            'amount' => $setting->price_per_session,
-            'status' => TransactionStatusEnum::PAID,
-        ]);
+        // 4️⃣ Transaksi: hanya buat saat gratis (semua harga 0). Kalau berbayar, transaksi dibuat di payment (QRIS/voucher/confirm-free).
+        $copyPriceOptions = $setting->getCopyPriceOptions();
+        $minPrice = empty($copyPriceOptions) ? 0 : min($copyPriceOptions);
+        $pricePerSession = (float) $minPrice;
+        if ($pricePerSession <= 0) {
+            $trx = Transaction::create([
+                'id' => 'trx_' . $session->id . '_' . time(),
+                'order_id' => 'FREE-' . $session->id . '-' . time(),
+                'session_id' => $session->id,
+                'owner_user_id' => $project->user_id,
+                'amount' => 0,
+                'status' => TransactionStatusEnum::PAID,
+                'type' => 'photobooth_session',
+            ]);
+            app(SettlementService::class)->recordSettlement($trx, 0);
+        }
 
-        // 5️⃣ Load frames aktif
+        // 5️⃣ Load frames aktif (dengan photo_slots + ukuran template untuk overlay capture)
         $frames = $project->frames()
             ->wherePivot('is_active', true)
             ->where('frames.is_active', true)
             ->get();
+
+        $framesForKiosk = $frames->map(function ($f) {
+            $tw = 1920;
+            $th = 1080;
+            $path = storage_path('app/public/' . $f->frame_file);
+            if (is_file($path)) {
+                $size = @getimagesize($path);
+                if ($size) {
+                    $tw = (int) $size[0];
+                    $th = (int) $size[1];
+                }
+            }
+            return [
+                'id' => $f->id,
+                'name' => $f->name,
+                'preview' => asset('storage/' . $f->preview_image),
+                'frame_file' => asset('storage/' . $f->frame_file),
+                'photo_slots' => $f->photo_slots ?? [],
+                'template_width' => $tw,
+                'template_height' => $th,
+            ];
+        })->values();
 
         // 6️⃣ Load welcome screen components (ordered by sort_order)
         $welcomeComponents = $project->welcomeScreenComponents()
             ->ordered()
             ->get();
 
-        // 7️⃣ Return kiosk view with all data for JS
-        return view('booth.kiosk', [
+        // 7️⃣ Return kiosk view with all data for JS + CSP untuk Midtrans Snap
+        $response = response()->view('booth.kiosk', [
             'project' => $project,
             'session' => $session,
             'setting' => $setting,
             'frames' => $frames,
+            'framesForKiosk' => $framesForKiosk,
             'welcomeComponents' => $welcomeComponents,
             'initialState' => 'IDLE',
+            'pricePerSession' => $pricePerSession,
+            'copyPriceOptions' => $copyPriceOptions,
         ]);
+
+        // CSP untuk Midtrans Snap (hanya saat popup dibuka, tidak perlu di halaman kiosk)
+        // CSP akan ditambahkan via meta tag di kiosk.blade.php jika diperlukan, atau via middleware
+        // Untuk sementara tidak set CSP di sini agar layout tidak rusak
+
+        return $response;
     }
 
     /**

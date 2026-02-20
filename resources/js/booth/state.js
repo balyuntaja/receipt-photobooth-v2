@@ -1,14 +1,16 @@
 /**
  * Kiosk state machine.
- * States: IDLE | FRAME | CAPTURE | PREVIEW | PRINT | DONE | RESET
+ * States: IDLE | PAYMENT | FRAME | CAPTURE | PREVIEW | PRINT | RESULT | RESET
  */
 
 const STATES = {
   IDLE: 'IDLE',
+  PAYMENT: 'PAYMENT',
   FRAME: 'FRAME',
   CAPTURE: 'CAPTURE',
   PREVIEW: 'PREVIEW',
   PRINT: 'PRINT',
+  RESULT: 'RESULT',
   DONE: 'DONE',
   RESET: 'RESET',
 };
@@ -22,6 +24,10 @@ export function createStateMachine(handlers = {}) {
   }
 
   function setState(newState) {
+    // Dari Welcome (IDLE) harus lewat PAYMENT dulu, tidak boleh langsung ke FRAME (backward compatibility / cache)
+    if (state === STATES.IDLE && newState === STATES.FRAME) {
+      newState = STATES.PAYMENT;
+    }
     if (state === newState) return;
     const prev = state;
     state = newState;
@@ -38,15 +44,12 @@ export function createStateMachine(handlers = {}) {
   }
 
   function render() {
-    document.querySelectorAll('.booth-screen').forEach((el) => {
-      const screenState = el.dataset.state;
-      if (screenState === state) {
-        el.classList.remove('hidden');
-        el.style.display = '';
-      } else {
-        el.classList.add('hidden');
-        el.style.display = 'none';
-      }
+    const screens = document.querySelectorAll('.booth-screen');
+    screens.forEach((el) => {
+      const screenState = el.getAttribute('data-state');
+      const isActive = screenState === state;
+      el.classList.toggle('hidden', !isActive);
+      el.style.display = isActive ? 'flex' : 'none';
     });
   }
 

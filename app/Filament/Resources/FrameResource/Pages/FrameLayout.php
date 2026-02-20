@@ -13,7 +13,7 @@ class FrameLayout extends Page
     use WithFileUploads;
     protected static string $resource = FrameResource::class;
 
-    protected static string $view = 'filament.frames.layout';
+    protected static string $view = 'filament.frame-editor.page';
 
     public Frame $record;
 
@@ -123,6 +123,19 @@ class FrameLayout extends Page
         if ($this->selectedSlotId === $id) {
             $this->selectedSlotId = null;
         }
+    }
+
+    /**
+     * Calculate slot style percentages for rendering.
+     */
+    public function getSlotStyle(array $slot): array
+    {
+        return [
+            'left' => ($slot['x'] / $this->canvasWidth) * 100,
+            'top' => ($slot['y'] / $this->canvasHeight) * 100,
+            'width' => ($slot['width'] / $this->canvasWidth) * 100,
+            'height' => ($slot['height'] / $this->canvasHeight) * 100,
+        ];
     }
 
     /**

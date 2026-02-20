@@ -1,8 +1,6 @@
 {{--
-    Camera Settings Modal
-    =====================
-    Modal for selecting camera device and managing printer connection.
-    Controlled via JS: resources/js/booth/camera-settings.js
+    Camera Settings Modal (Pengaturan Perangkat)
+    Camera, printer.
 --}}
 
 <div
@@ -11,20 +9,18 @@
     aria-hidden="true"
     role="dialog"
     aria-labelledby="camera-settings-title"
-    aria-modal="true"
->
+    aria-modal="true">
     <div class="booth-modal">
         {{-- Header --}}
         <div class="mb-4 flex items-center justify-between">
             <h2 id="camera-settings-title" class="text-lg font-semibold text-gray-900">
-                Camera Settings
+                Pengaturan Perangkat
             </h2>
             <button
                 type="button"
                 id="camera-settings-close"
                 class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Close"
-            >
+                aria-label="Close">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -38,8 +34,7 @@
             </label>
             <select
                 id="camera-settings-select"
-                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 <option value="">Loading cameras...</option>
             </select>
         </div>
@@ -55,8 +50,7 @@
                     class="h-full w-full object-cover"
                     autoplay
                     playsinline
-                    muted
-                ></video>
+                    muted></video>
                 {{-- Placeholder when no stream --}}
                 <div class="absolute inset-0 flex items-center justify-center text-gray-400" id="camera-settings-placeholder">
                     <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,8 +74,7 @@
             <button
                 type="button"
                 id="camera-settings-connect-printer"
-                class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
+                class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                 Hubungkan Printer
             </button>
         </div>
@@ -91,8 +84,7 @@
             <button
                 type="button"
                 id="camera-settings-save"
-                class="flex-1 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            >
+                class="flex-1 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
                 Simpan
             </button>
         </div>

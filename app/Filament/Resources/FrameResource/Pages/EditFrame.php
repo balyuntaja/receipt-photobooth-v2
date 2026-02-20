@@ -11,6 +11,12 @@ class EditFrame extends EditRecord
 {
     protected static string $resource = FrameResource::class;
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+        $this->redirect(FrameResource::getUrl('layout', ['record' => $this->record]));
+    }
+
     public function getHeading(): string | Htmlable
     {
         return $this->record->name ?: 'Untitled Frame';

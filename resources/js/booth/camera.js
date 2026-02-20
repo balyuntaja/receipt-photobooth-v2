@@ -7,6 +7,7 @@ import { isAndroid } from './camera-utils.js';
 
 const STORAGE_KEY = 'photobooth_selectedCameraId';
 
+/** Aspect ratio 4:3 (landscape) sesuai preview. */
 function cropVideoToLandscape(video) {
   const aspect = 4 / 3;
   const vw = video.videoWidth;
@@ -26,7 +27,7 @@ function cropVideoToLandscape(video) {
   return { x: sx, y: sy, width: sw, height: sh };
 }
 
-export function createCamera(session) {
+export function createCamera(session, options = {}) {
   const video = document.getElementById('video-preview');
   const canvas = document.getElementById('capture-canvas');
   const countdownOverlay = document.getElementById('countdown-overlay');
@@ -38,6 +39,7 @@ export function createCamera(session) {
   const captureStatus = document.getElementById('capture-status');
   const btnStartCamera = document.getElementById('btn-start-camera');
   const btnStartCapture = document.getElementById('btn-start-capture');
+  const exposureSlider = document.getElementById('capture-exposure');
   const btnBack = document.getElementById('btn-capture-back');
   const btnNext = document.getElementById('btn-capture-next');
 
@@ -49,9 +51,11 @@ export function createCamera(session) {
   let isLoading = false;
   let hasStarted = false;
   let isCapturing = false;
-  let exposure = 50;
+  let exposureMin = -2;
+  let exposureMax = 2;
+  let exposureSupported = false;
   const maxPhotos = 1;
-  const countdownDelay = 3;
+  const countdownDelay = Math.min(10, Math.max(1, parseInt(options.countdownSeconds, 10) || 3));
 
   function stopStream() {
     if (stream) {
@@ -63,6 +67,10 @@ export function createCamera(session) {
     }
     if (video.src) {
       video.src = '';
+    }
+    // Reset filter saat stream dihentikan
+    if (video) {
+      video.style.filter = '';
     }
     isActive = false;
     hasStarted = false;
@@ -98,10 +106,53 @@ export function createCamera(session) {
       cameraStartOverlay?.classList.remove('flex');
       captureStartOverlay?.classList.remove('hidden');
       captureStartOverlay?.classList.add('flex');
+      setupExposureControl(stream);
+      // Apply exposure filter saat stream dimulai
+      applyExposureFromSlider();
     } catch (err) {
       console.error('Camera error:', err);
       isLoading = false;
       alert('Tidak dapat mengakses kamera. Pastikan izin kamera diberikan.');
+    }
+  }
+
+  function setupExposureControl(stream) {
+    const track = stream.getVideoTracks()[0];
+    if (!track || !exposureSlider) return;
+    exposureSlider.disabled = false;
+    const caps = track.getCapabilities?.();
+    if (caps && typeof caps.exposureCompensation !== 'undefined') {
+      const r = caps.exposureCompensation;
+      exposureMin = r.min ?? -2;
+      exposureMax = r.max ?? 2;
+      exposureSupported = true;
+      exposureSlider.title = `Exposure (${exposureMin} … ${exposureMax})`;
+      applyExposureFromSlider();
+    } else {
+      exposureSupported = false;
+      exposureSlider.title = 'Exposure: tidak didukung kamera ini';
+    }
+  }
+
+  function applyExposureFromSlider() {
+    if (!stream || !exposureSlider) return;
+    const raw = Number(exposureSlider.value);
+    
+    // Apply CSS filter untuk visual feedback langsung di preview
+    // Convert 0-100 to brightness/contrast: 0 = darker, 50 = normal, 100 = brighter
+    const brightness = 0.3 + (raw / 100) * 1.7; // 0.3 to 2.0
+    const contrast = 0.7 + (raw / 100) * 0.6; // 0.7 to 1.3
+    const filterValue = `brightness(${brightness}) contrast(${contrast})`;
+    if (video) {
+      video.style.filter = filterValue;
+    }
+    
+    // Apply ke camera track jika didukung
+    if (exposureSupported) {
+      const track = stream.getVideoTracks()[0];
+      if (!track) return;
+      const value = exposureMin + (raw / 100) * (exposureMax - exposureMin);
+      track.applyConstraints({ advanced: [{ exposureCompensation: value }] }).catch(() => {});
     }
   }
 
@@ -112,11 +163,23 @@ export function createCamera(session) {
     canvas.height = crop.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
+
+    // Jika kamera tidak mendukung exposureCompensation, kita pakai CSS filter di preview.
+    // drawImage tidak menangkap CSS filter, jadi terapkan filter yang sama ke canvas.
+    if (!exposureSupported && exposureSlider) {
+      const raw = Number(exposureSlider.value);
+      const brightness = 0.3 + (raw / 100) * 1.7;
+      const contrast = 0.7 + (raw / 100) * 0.6;
+      ctx.filter = `brightness(${brightness}) contrast(${contrast})`;
+    }
+
     ctx.drawImage(
       video,
       crop.x, crop.y, crop.width, crop.height,
       0, 0, canvas.width, canvas.height
     );
+
+    ctx.filter = 'none';
     return canvas.toDataURL('image/png');
   }
 
@@ -157,6 +220,8 @@ export function createCamera(session) {
 
   async function doCountdown(callback) {
     if (!countdownOverlay || !countdownNumber) return callback?.();
+    captureStartOverlay?.classList.add('hidden');
+    captureStartOverlay?.classList.remove('flex');
     countdownOverlay.classList.remove('hidden');
     countdownOverlay.classList.add('flex');
     for (let i = countdownDelay; i > 0; i--) {
@@ -165,6 +230,8 @@ export function createCamera(session) {
     }
     countdownOverlay.classList.add('hidden');
     countdownOverlay.classList.remove('flex');
+    captureStartOverlay?.classList.remove('hidden');
+    captureStartOverlay?.classList.add('flex');
     callback?.();
   }
 
@@ -209,6 +276,7 @@ export function createCamera(session) {
 
   btnStartCamera?.addEventListener('click', startStream);
   btnStartCapture?.addEventListener('click', startCaptureSequence);
+  exposureSlider?.addEventListener('input', applyExposureFromSlider);
 
   return {
     stop: stopStream,

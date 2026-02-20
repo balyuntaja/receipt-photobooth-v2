@@ -3,17 +3,19 @@
 namespace App\Filament\Resources\MediaResource\Pages;
 
 use App\Filament\Resources\MediaResource;
-use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListMedia extends ListRecords
 {
     protected static string $resource = MediaResource::class;
 
-    protected function getHeaderActions(): array
+    public function getHeading(): string
     {
-        return [
-            Actions\CreateAction::make(),
-        ];
+        return 'Gallery';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Manage all user generated photos';
     }
 }

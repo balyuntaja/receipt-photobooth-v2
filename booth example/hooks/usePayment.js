@@ -1,5 +1,5 @@
 /**
- * Custom Hook untuk Payment Gateway Duitku
+ * Custom Hook untuk Payment Gateway
  * 
  * Usage:
  * const { createPayment, loading, error, paymentData, reset } = usePayment();

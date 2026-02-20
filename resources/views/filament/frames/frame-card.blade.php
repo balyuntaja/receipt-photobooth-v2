@@ -45,18 +45,11 @@
                 class="absolute right-0 top-full z-50 mt-1 w-48 origin-top-right rounded-lg bg-white py-1 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10"
             >
                 <a
-                    href="{{ route('filament.admin.resources.frames.edit', $record) }}"
+                    href="{{ route('filament.admin.resources.frames.layout', $record) }}"
                     class="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                 >
                     <x-filament::icon icon="heroicon-o-pencil-square" class="h-5 w-5 text-gray-400" />
                     Ubah
-                </a>
-                <a
-                    href="{{ route('filament.admin.resources.frames.layout', $record) }}"
-                    class="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
-                >
-                    <x-filament::icon icon="heroicon-o-rectangle-stack" class="h-5 w-5 text-gray-400" />
-                    Atur Layout
                 </a>
                 <form action="{{ route('filament.admin.frames.delete', $record) }}" method="POST" class="[&_button]:w-full [&_button]:text-left">
                     @csrf

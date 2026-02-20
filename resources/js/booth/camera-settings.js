@@ -1,11 +1,10 @@
 /**
- * Camera Settings Module
- * ======================
- * Handles camera selection, preview, and localStorage persistence.
- * Based on booth example CameraSettingModal.jsx, ported to plain JS.
+ * Camera Settings Module (Pengaturan Perangkat)
+ * Camera, printer (WebUSB).
  */
 
 import { enumerateCameras, isAndroid } from './camera-utils.js';
+import { connectPrinter, disconnectPrinter, isPrinterConnected } from './printer.js';
 
 const STORAGE_KEY = 'photobooth_selectedCameraId';
 
@@ -35,6 +34,10 @@ function getPrinterStatusEl() {
 
 let previewStream = null;
 
+function getPlaceholderEl() {
+  return document.getElementById('camera-settings-placeholder');
+}
+
 function stopPreviewStream() {
   if (previewStream) {
     previewStream.getTracks().forEach((t) => t.stop());
@@ -45,6 +48,8 @@ function stopPreviewStream() {
     video.srcObject = null;
     video.src = '';
   }
+  const placeholder = getPlaceholderEl();
+  if (placeholder) placeholder.style.display = '';
 }
 
 function startPreview(deviceId) {
@@ -66,15 +71,22 @@ function startPreview(deviceId) {
           audio: false,
         };
 
+  const placeholder = getPlaceholderEl();
+  if (placeholder) placeholder.style.display = '';
+
   navigator.mediaDevices
     .getUserMedia(constraints)
     .then((stream) => {
       previewStream = stream;
       video.srcObject = stream;
       video.src = '';
+      if (placeholder) placeholder.style.display = 'none';
       video.play().catch((err) => console.warn('[camera-settings] video play failed:', err));
     })
-    .catch((err) => console.error('[camera-settings] preview failed:', err));
+    .catch((err) => {
+      console.error('[camera-settings] preview failed:', err);
+      if (placeholder) placeholder.style.display = '';
+    });
 }
 
 // ===========================
@@ -168,6 +180,8 @@ function openModal() {
     }
   });
 
+  updatePrinterStatus();
+
   const select = getSelectEl();
   if (select) {
     select.addEventListener('change', onSelectChange);
@@ -191,13 +205,70 @@ function closeModal() {
 }
 
 // ===========================
-// PRINTER (STUB)
+// PRINTER (WebUSB)
 // ===========================
 
-function handleConnectPrinter() {
-  // WebUSB printer connection is not implemented in Laravel kiosk.
-  // Use browser's native print dialog instead.
-  alert('Printer akan menggunakan dialog print bawaan browser.\nFitur WebUSB tidak tersedia.');
+function updatePrinterStatus() {
+  const statusEl = getPrinterStatusEl();
+  const btnEl = document.getElementById('camera-settings-connect-printer');
+  if (!statusEl || !btnEl) return;
+
+  if (isPrinterConnected()) {
+    statusEl.textContent = 'Terhubung';
+    statusEl.classList.remove('text-red-600');
+    statusEl.classList.add('text-green-600');
+    btnEl.textContent = 'Putuskan Printer';
+    btnEl.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    btnEl.classList.add('bg-gray-500', 'hover:bg-gray-600');
+    btnEl.dataset.action = 'disconnect';
+  } else {
+    statusEl.textContent = 'Tidak Terhubung';
+    statusEl.classList.remove('text-green-600');
+    statusEl.classList.add('text-red-600');
+    btnEl.textContent = 'Hubungkan Printer';
+    btnEl.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+    btnEl.classList.add('bg-blue-600', 'hover:bg-blue-700');
+    btnEl.dataset.action = 'connect';
+  }
+}
+
+async function handleConnectPrinter() {
+  const btnEl = document.getElementById('camera-settings-connect-printer');
+  const action = btnEl?.dataset.action || 'connect';
+
+  if (action === 'disconnect') {
+    try {
+      btnEl.disabled = true;
+      await disconnectPrinter();
+      updatePrinterStatus();
+    } catch (err) {
+      console.error('Disconnect printer error:', err);
+      alert('Gagal memutuskan printer: ' + (err.message || 'Unknown error'));
+    } finally {
+      btnEl.disabled = false;
+    }
+    return;
+  }
+
+  // Connect
+  try {
+    if (!navigator.usb) {
+      alert('WebUSB tidak didukung di browser ini. Gunakan Chrome atau Edge untuk koneksi printer.');
+      return;
+    }
+    btnEl.disabled = true;
+    await connectPrinter(0x0418);
+    updatePrinterStatus();
+  } catch (err) {
+    if (err.name === 'NotFoundError') {
+      alert('Tidak ada printer yang dipilih atau printer tidak ditemukan.');
+    } else {
+      console.error('Connect printer error:', err);
+      alert('Gagal menghubungkan printer: ' + (err.message || 'Unknown error'));
+    }
+  } finally {
+    btnEl.disabled = false;
+  }
 }
 
 // ===========================

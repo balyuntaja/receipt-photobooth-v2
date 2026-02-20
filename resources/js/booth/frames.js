@@ -40,7 +40,7 @@ export function initFrames(stateMachine, session) {
     btn.addEventListener('click', () => selectFrame(btn.dataset.frameId));
   });
 
-  btnBack?.addEventListener('click', () => stateMachine.setState(stateMachine.STATES.IDLE));
+  btnBack?.addEventListener('click', () => stateMachine.setState(stateMachine.STATES.PAYMENT));
   btnNext?.addEventListener('click', () => {
     if (!selectedFrameId) return;
     session.saveFrame(selectedFrameId).then(() => {

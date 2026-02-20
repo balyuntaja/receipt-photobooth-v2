@@ -3,8 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MediaTypeEnum;
+use App\Enums\TransactionStatusEnum;
 use App\Models\BoothSession;
 use App\Models\Media;
+use App\Models\SessionPreference;
+use App\Models\Transaction;
+use App\Models\Voucher;
+use App\Services\MidtransService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -96,6 +101,164 @@ class BoothSessionController extends Controller
             'media_id' => $media->id,
             'path' => $path,
         ]);
+    }
+
+    /**
+     * Create Midtrans Snap payment for session (QRIS etc). Creates pending transaction and returns snap_token.
+     * Accepts copy_count to determine price from copy_prices.
+     */
+    public function createPayment(Request $request, BoothSession $session): JsonResponse
+    {
+        $project = $session->project;
+        $setting = $project->setting;
+        $copyCount = max(1, (int) ($request->input('copy_count', 1)));
+        $amount = (int) round($setting->getPriceForCopies($copyCount));
+        if ($amount <= 0) {
+            return response()->json(['message' => 'Session is free'], 422);
+        }
+        if ($session->transaction()->exists()) {
+            $trx = $session->transaction;
+            if ($trx->status === TransactionStatusEnum::PAID) {
+                return response()->json(['message' => 'Already paid', 'snap_token' => null, 'order_id' => $trx->order_id], 200);
+            }
+            if ($trx->status === TransactionStatusEnum::PENDING && $trx->order_id) {
+                try {
+                    $snapToken = app(MidtransService::class)->createTransaction([
+                        'transaction_details' => [
+                            'order_id' => $trx->order_id,
+                            'gross_amount' => $trx->amount,
+                        ],
+                        'customer_details' => [
+                            'first_name' => 'Booth',
+                            'email' => 'booth@kiosk.local',
+                        ],
+                    ]);
+                    return response()->json(['snap_token' => $snapToken, 'order_id' => $trx->order_id]);
+                } catch (\Throwable $e) {
+                    return response()->json(['message' => 'Payment error: ' . $e->getMessage()], 500);
+                }
+            }
+        }
+
+        $orderId = 'BOOTH-' . $session->id . '-' . time();
+        $trxId = 'trx_' . $session->id . '_' . time();
+
+        Transaction::create([
+            'id' => $trxId,
+            'order_id' => $orderId,
+            'session_id' => $session->id,
+            'owner_user_id' => $project->user_id,
+            'amount' => $amount,
+            'status' => TransactionStatusEnum::PENDING,
+            'type' => 'photobooth_session',
+        ]);
+
+        $this->saveSessionCopyCount($session, $copyCount);
+
+        try {
+            $snapToken = app(MidtransService::class)->createTransaction([
+                'transaction_details' => [
+                    'order_id' => $orderId,
+                    'gross_amount' => $amount,
+                ],
+                'customer_details' => [
+                    'first_name' => 'Booth',
+                    'email' => 'booth@kiosk.local',
+                ],
+            ]);
+            return response()->json(['snap_token' => $snapToken, 'order_id' => $orderId]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Payment error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Apply voucher code for session. Validates voucher belongs to project owner and is unused.
+     */
+    public function applyVoucher(Request $request, BoothSession $session): JsonResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:255'],
+            'copy_count' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $copyCount = max(1, (int) ($validated['copy_count'] ?? 1));
+        $project = $session->project;
+        $voucher = Voucher::where('code', $validated['code'])->first();
+        if (!$voucher) {
+            return response()->json(['message' => 'Voucher tidak ditemukan'], 422);
+        }
+        if ($voucher->user_id !== $project->user_id) {
+            return response()->json(['message' => 'Voucher tidak valid untuk project ini'], 422);
+        }
+        if ($voucher->expires_at && $voucher->expires_at->isPast()) {
+            return response()->json(['message' => 'Voucher sudah kadaluarsa'], 422);
+        }
+        $quota = (int) ($voucher->quota ?? 1);
+        if ($quota < 1) {
+            return response()->json(['message' => 'Voucher sudah habis'], 422);
+        }
+        if ($session->transaction()->exists()) {
+            return response()->json(['message' => 'Session sudah memiliki transaksi'], 422);
+        }
+
+        if ($quota === 1) {
+            $voucher->delete();
+        } else {
+            $voucher->decrement('quota');
+        }
+        $orderId = 'VOUCHER-' . $session->id . '-' . time();
+        $trx = Transaction::create([
+            'id' => 'trx_' . $session->id . '_' . time(),
+            'order_id' => $orderId,
+            'session_id' => $session->id,
+            'owner_user_id' => $project->user_id,
+            'amount' => 0,
+            'status' => TransactionStatusEnum::PAID,
+            'type' => 'photobooth_session',
+        ]);
+        app(\App\Services\SettlementService::class)->recordSettlement($trx, 0);
+        $this->saveSessionCopyCount($session, $copyCount);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Confirm free session (price = 0). Creates PAID transaction so user can proceed to frame selection.
+     */
+    public function confirmFree(Request $request, BoothSession $session): JsonResponse
+    {
+        $project = $session->project;
+        $setting = $project->setting;
+        $amount = (float) ($setting->price_per_session ?? 0);
+        if ($amount > 0) {
+            return response()->json(['message' => 'Session is not free'], 422);
+        }
+        $copyCount = max(1, (int) ($request->input('copy_count', 1)));
+        if ($session->transaction()->exists()) {
+            $this->saveSessionCopyCount($session, $copyCount);
+            return response()->json(['success' => true]);
+        }
+        $orderId = 'FREE-' . $session->id . '-' . time();
+        $trx = Transaction::create([
+            'id' => 'trx_' . $session->id . '_' . time(),
+            'order_id' => $orderId,
+            'session_id' => $session->id,
+            'owner_user_id' => $project->user_id,
+            'amount' => 0,
+            'status' => TransactionStatusEnum::PAID,
+            'type' => 'photobooth_session',
+        ]);
+        app(\App\Services\SettlementService::class)->recordSettlement($trx, 0);
+        $this->saveSessionCopyCount($session, $copyCount);
+        return response()->json(['success' => true]);
+    }
+
+    private function saveSessionCopyCount(BoothSession $session, int $copyCount): void
+    {
+        $session->preference()->updateOrCreate(
+            ['session_id' => $session->id],
+            ['copy_count' => $copyCount]
+        );
     }
 
     /**

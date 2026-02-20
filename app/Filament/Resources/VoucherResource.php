@@ -7,12 +7,13 @@ use App\Filament\Resources\VoucherResource\RelationManagers;
 use App\Models\Voucher;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-
+use Illuminate\Support\Facades\Auth;
 class VoucherResource extends Resource
 {
     protected static ?string $model = Voucher::class;
@@ -25,7 +26,7 @@ class VoucherResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('user_id', auth()->id());
+            ->where('user_id', Auth::id());
     }
 
     public static function form(Form $form): Form
@@ -40,15 +41,26 @@ class VoucherResource extends Resource
                     'fixed' => 'Fixed (Rp)',
                     'percent' => 'Percent (%)',
                 ])
-                ->required(),
+                ->required()
+                ->live(),
 
             Forms\Components\TextInput::make('value')
                 ->numeric()
-                ->required(),
+                ->required()
+                ->prefix(fn (Get $get) => $get('type') === 'fixed' ? 'Rp' : null)
+                ->suffix(fn (Get $get) => $get('type') === 'percent' ? '%' : null)
+                ->minValue(0)
+                ->maxValue(fn (Get $get) => $get('type') === 'percent' ? 100 : null)
+                ->helperText(fn (Get $get) => $get('type') === 'percent' ? 'Maksimal 100%' : null),
+
+            Forms\Components\TextInput::make('quota')
+                ->numeric()
+                ->default(1)
+                ->minValue(1)
+                ->required()
+                ->helperText('Jumlah kali voucher bisa dipakai. Jika 1, voucher hilang setelah sekali pakai.'),
 
             Forms\Components\DatePicker::make('expires_at'),
-
-            Forms\Components\Toggle::make('is_active'),
         ]);
     }
 
@@ -58,7 +70,8 @@ class VoucherResource extends Resource
             Tables\Columns\TextColumn::make('code')->searchable(),
             Tables\Columns\TextColumn::make('type'),
             Tables\Columns\TextColumn::make('value'),
-            Tables\Columns\IconColumn::make('is_active')->boolean(),
+            Tables\Columns\TextColumn::make('quota'),
+            Tables\Columns\TextColumn::make('expires_at')->date(),
         ]);
     }
 
