@@ -52,24 +52,31 @@ function stopPreviewStream() {
   if (placeholder) placeholder.style.display = '';
 }
 
+/** Nilai facingMode dari storage/select untuk Android. */
+function getFacingModeFromValue(value) {
+  if (value === 'android-user') return 'user';
+  if (value === 'android-environment') return 'environment';
+  return 'environment'; // default
+}
+
 function startPreview(deviceId) {
   stopPreviewStream();
   const video = getPreviewEl();
   if (!video) return;
 
-  const constraints =
-    isAndroid() || deviceId === 'android-default'
-      ? {
-          video: { facingMode: 'environment', aspectRatio: 4 / 3 },
-          audio: false,
-        }
-      : {
-          video: {
-            deviceId: deviceId ? { ideal: deviceId } : true,
-            aspectRatio: 4 / 3,
-          },
-          audio: false,
-        };
+  const useFacingMode = isAndroid() || deviceId === 'android-default' || deviceId === 'android-user' || deviceId === 'android-environment';
+  const constraints = useFacingMode
+    ? {
+        video: { facingMode: getFacingModeFromValue(deviceId), aspectRatio: 4 / 3 },
+        audio: false,
+      }
+    : {
+        video: {
+          deviceId: deviceId ? { ideal: deviceId } : true,
+          aspectRatio: 4 / 3,
+        },
+        audio: false,
+      };
 
   const placeholder = getPlaceholderEl();
   if (placeholder) placeholder.style.display = '';
@@ -101,11 +108,20 @@ function populateSelect(devices, savedDeviceId) {
   let selectedId = savedDeviceId;
 
   if (isAndroid()) {
-    const optAndroid = document.createElement('option');
-    optAndroid.value = 'android-default';
-    optAndroid.textContent = 'Android Camera (Auto - facingMode)';
-    select.appendChild(optAndroid);
-    selectedId = 'android-default';
+    const optBack = document.createElement('option');
+    optBack.value = 'android-environment';
+    optBack.textContent = 'Kamera Belakang';
+    select.appendChild(optBack);
+    const optFront = document.createElement('option');
+    optFront.value = 'android-user';
+    optFront.textContent = 'Kamera Depan';
+    select.appendChild(optFront);
+    // Default atau pilihan tersimpan
+    if (savedDeviceId === 'android-user' || savedDeviceId === 'android-environment') {
+      selectedId = savedDeviceId;
+    } else {
+      selectedId = 'android-environment';
+    }
   } else {
     if (devices.length === 0) {
       const optNone = document.createElement('option');
@@ -139,10 +155,8 @@ function loadCameras() {
     const saved = localStorage.getItem(STORAGE_KEY);
     const selectedId = populateSelect(devices, saved);
     
-    if (selectedId && selectedId !== 'android-default') {
+    if (selectedId) {
       localStorage.setItem(STORAGE_KEY, selectedId);
-    } else if (selectedId === 'android-default') {
-      localStorage.removeItem(STORAGE_KEY);
     }
     
     return selectedId;
@@ -156,12 +170,10 @@ function loadCameras() {
 function onSelectChange() {
   const select = getSelectEl();
   if (!select) return;
-  
+
   const newId = select.value;
-  if (newId !== 'android-default') {
+  if (newId) {
     localStorage.setItem(STORAGE_KEY, newId);
-  } else {
-    localStorage.removeItem(STORAGE_KEY);
   }
   startPreview(newId);
 }
@@ -295,7 +307,7 @@ export function initCameraSettings() {
   // Save and close
   btnSave?.addEventListener('click', () => {
     const select = getSelectEl();
-    if (select?.value && select.value !== 'android-default') {
+    if (select?.value) {
       localStorage.setItem(STORAGE_KEY, select.value);
     }
     closeModal();

@@ -80,10 +80,11 @@ export function createCamera(session, options = {}) {
     if (isLoading || isActive) return;
     const deviceId = localStorage.getItem(STORAGE_KEY) || null;
 
-    const useFacingMode = isAndroid() || deviceId === 'android-default';
+    const useFacingMode = isAndroid() || deviceId === 'android-default' || deviceId === 'android-user' || deviceId === 'android-environment';
+    const facingMode = deviceId === 'android-user' ? 'user' : (deviceId === 'android-environment' ? 'environment' : 'environment');
     const constraints = useFacingMode
       ? {
-          video: { facingMode: 'environment', aspectRatio: 4 / 3 },
+          video: { facingMode, aspectRatio: 4 / 3 },
           audio: false,
         }
       : {
