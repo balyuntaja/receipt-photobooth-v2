@@ -6,7 +6,6 @@ use App\Models\BoothSession;
 use App\Models\Transaction;
 use App\Models\Media;
 use App\Enums\TransactionStatusEnum;
-use App\Enums\SessionStatusEnum;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
@@ -19,8 +18,10 @@ class DashboardStatsWidget extends StatsOverviewWidget
     {
         $userId = Auth::id();
 
+        // Session terhitung hanya jika pembayaran/voucher berhasil (transaction PAID)
         $sessionsToday = BoothSession::whereDate('created_at', today())
             ->whereHas('project', fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('transaction', fn ($q) => $q->where('status', TransactionStatusEnum::PAID))
             ->count();
 
         $revenueToday = Transaction::whereDate('created_at', today())
@@ -29,10 +30,7 @@ class DashboardStatsWidget extends StatsOverviewWidget
             ->sum('amount');
 
         $totalSessions = BoothSession::whereHas('project', fn ($q) => $q->where('user_id', $userId))
-            ->whereIn('status', [
-                SessionStatusEnum::COMPLETED,
-                SessionStatusEnum::IN_PROGRESS,
-            ])
+            ->whereHas('transaction', fn ($q) => $q->where('status', TransactionStatusEnum::PAID))
             ->count();
 
         $totalMedia = Media::whereHas('session.project', fn ($q) => $q->where('user_id', $userId))
