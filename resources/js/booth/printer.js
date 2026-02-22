@@ -18,7 +18,12 @@ const BLE_SERVICES = [
   '0000ffe0-0000-1000-8000-00805f9b34fb', // Common BLE serial
 ];
 
-const BLE_CHUNK_SIZE = 512; // BLE MTU-friendly chunk size
+/** BLE chunk size: 20 = default MTU (aman), 185 = setelah negosiasi (lebih cepat) */
+const BLE_CHUNK_SIZE = 20;
+const BLE_CHUNK_DELAY_MS = 15; // Delay antar chunk agar printer tidak kewalahan
+
+/** Nordic UART TX - karakteristik untuk menulis ke BLE serial */
+const NORDIC_UART_TX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
 /**
  * Connect to thermal printer via WebUSB
@@ -60,27 +65,31 @@ export async function connectPrinterBLE() {
   const services = await server.getPrimaryServices();
 
   let writeChar = null;
+  let nordicTx = null;
+
   for (const svc of services) {
     const chars = await svc.getCharacteristics();
     for (const c of chars) {
-      if (c.properties.write || c.properties.writeWithoutResponse) {
-        writeChar = c;
+      if (!c.properties.write && !c.properties.writeWithoutResponse) continue;
+      if (c.uuid.toLowerCase() === NORDIC_UART_TX) {
+        nordicTx = c;
         break;
       }
+      if (!writeChar) writeChar = c;
     }
-    if (writeChar) break;
   }
 
-  if (!writeChar) {
+  const chosen = nordicTx || writeChar;
+  if (!chosen) {
     await server.disconnect();
     throw new Error('Tidak ditemukan karakteristik untuk menulis data. Pastikan printer BLE mendukung ESC/POS.');
   }
 
   PRINTER_STATE.type = 'bluetooth';
   PRINTER_STATE.device = device;
-  PRINTER_STATE.characteristic = writeChar;
+  PRINTER_STATE.characteristic = chosen;
   PRINTER_STATE.server = server;
-  console.log('[Printer] BLE connected:', device.name);
+  console.log('[Printer] BLE connected:', device.name, 'char:', chosen.uuid);
 }
 
 /**
@@ -296,9 +305,31 @@ async function sendToPrinter(data) {
     return;
   }
   if (PRINTER_STATE.type === 'bluetooth' && PRINTER_STATE.characteristic) {
+    const char = PRINTER_STATE.characteristic;
+    const useNoResponse = char.properties.writeWithoutResponse;
+
+    const writeChunk = async (chunk) => {
+      try {
+        if (useNoResponse && chunk.byteLength <= 512) {
+          await char.writeValueWithoutResponse(chunk);
+        } else {
+          await char.writeValue(chunk);
+        }
+      } catch (e) {
+        if (useNoResponse && e.name !== 'NetworkError') {
+          await char.writeValue(chunk);
+        } else {
+          throw e;
+        }
+      }
+    };
+
     for (let i = 0; i < data.length; i += BLE_CHUNK_SIZE) {
       const chunk = data.slice(i, i + BLE_CHUNK_SIZE);
-      await PRINTER_STATE.characteristic.writeValue(chunk);
+      await writeChunk(chunk);
+      if (BLE_CHUNK_DELAY_MS > 0 && i + BLE_CHUNK_SIZE < data.length) {
+        await new Promise((r) => setTimeout(r, BLE_CHUNK_DELAY_MS));
+      }
     }
     return;
   }
@@ -314,6 +345,10 @@ async function sendToPrinter(data) {
 export async function printPhotostrip(imageDataUrl, quantity = 1) {
   if (!PRINTER_STATE.device) {
     throw new Error('Printer belum terhubung. Silakan hubungkan printer terlebih dahulu.');
+  }
+
+  if (PRINTER_STATE.type === 'bluetooth' && PRINTER_STATE.server && !PRINTER_STATE.server.connected) {
+    throw new Error('Koneksi printer terputus. Silakan hubungkan ulang printer di Pengaturan.');
   }
 
   const escposData = await convertToESCPos(imageDataUrl);
