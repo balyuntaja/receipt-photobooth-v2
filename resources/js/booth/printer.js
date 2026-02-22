@@ -19,7 +19,7 @@ const BLE_SERVICES = [
 ];
 
 /** BLE: chunk besar + tanpa delay = lebih cepat (mirip kecepatan USB) */
-const BLE_CHUNK_SIZE = 128; // Max ATT MTU, didukung setelah negosiasi saat connect
+const BLE_CHUNK_SIZE = 180; // Max ATT MTU, didukung setelah negosiasi saat connect
 const BLE_CHUNK_DELAY_MS = 0; // Tidak perlu delay dengan chunk besar
 
 /** Nordic UART TX - karakteristik untuk menulis ke BLE serial */
