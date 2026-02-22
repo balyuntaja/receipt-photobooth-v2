@@ -61,7 +61,7 @@ class BoothSession extends Model
 
     public function preference()
     {
-        return $this->hasOne(SessionPreference::class);
+        return $this->hasOne(SessionPreference::class, 'session_id', 'id');
     }
 
     public function devices()

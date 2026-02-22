@@ -19,6 +19,6 @@ class SessionPreference extends Model
 
     public function session()
     {
-        return $this->belongsTo(BoothSession::class);
+        return $this->belongsTo(BoothSession::class, 'session_id', 'id');
     }
 }

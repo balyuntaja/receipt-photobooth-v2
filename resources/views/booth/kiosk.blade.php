@@ -8,7 +8,8 @@
     <meta name="theme-color" content="#000000">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     {{-- CSP untuk Midtrans Snap popup (termasuk snap-assets CDN) --}}
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://snap-assets.*.cdn.gtflabs.io blob: http://localhost:* http://127.0.0.1:*; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com blob:; style-src 'self' 'unsafe-inline' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://snap-assets.*.cdn.gtflabs.io https: http://localhost:* http://127.0.0.1:*; connect-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://snap-assets.*.cdn.gtflabs.io wss: ws: https: http://localhost:* http://127.0.0.1:* blob:; img-src 'self' data: https: blob:; font-src 'self' data: https:">
+    {{-- CSP: wildcard * hanya di awal host (e.g. *.gtflabs.io), bukan snap-assets.*.cdn --}}
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://*.gtflabs.io blob: http://localhost:* http://127.0.0.1:*; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com blob:; style-src 'self' 'unsafe-inline' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://*.gtflabs.io https: http://localhost:* http://127.0.0.1:*; connect-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://*.gtflabs.io wss: ws: https: http://localhost:* http://127.0.0.1:* blob:; img-src 'self' data: https: blob:; font-src 'self' data: https:">
 
     @vite(['resources/css/booth.css', 'resources/js/booth/kiosk.js'])
 </head>
