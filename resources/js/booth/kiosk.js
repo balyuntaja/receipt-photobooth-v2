@@ -686,7 +686,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('btn-result-home')?.addEventListener('click', () => {
-    stateMachine.setState(stateMachine.STATES.RESET);
+    const projectId = document.body.dataset.projectId;
+    if (projectId) {
+      window.location.href = `/booth/${projectId}`;
+    } else {
+      stateMachine.setState(stateMachine.STATES.RESET);
+    }
   });
 
   stateMachine.subscribe((state) => {
@@ -703,7 +708,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btn-reset')?.addEventListener('click', () => {
-    window.location.href = window.location.pathname;
+    const projectId = document.body.dataset.projectId;
+    if (projectId) {
+      window.location.href = `/booth/${projectId}`;
+    } else {
+      window.location.reload();
+    }
   });
 
   // Lock / Fullscreen button (manual only – no auto fullscreen on page load)
