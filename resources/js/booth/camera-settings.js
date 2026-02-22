@@ -4,9 +4,17 @@
  */
 
 import { enumerateCameras, isAndroid } from './camera-utils.js';
-import { connectPrinter, disconnectPrinter, isPrinterConnected } from './printer.js';
+import {
+  connectPrinterUSB,
+  connectPrinterBLE,
+  disconnectPrinter,
+  isPrinterConnected,
+  isWebUSBAvailable,
+  isWebBluetoothAvailable,
+} from './printer.js';
 
 const STORAGE_KEY = 'photobooth_selectedCameraId';
+const PRINTER_TYPE_KEY = 'photobooth_printerType';
 
 // ===========================
 // DOM HELPERS
@@ -26,6 +34,10 @@ function getPreviewEl() {
 
 function getPrinterStatusEl() {
   return document.getElementById('camera-settings-printer-status');
+}
+
+function getPrinterTypeSelect() {
+  return document.getElementById('camera-settings-printer-type');
 }
 
 // ===========================
@@ -192,12 +204,48 @@ function openModal() {
     }
   });
 
+  updatePrinterTypeSelect();
   updatePrinterStatus();
 
   const select = getSelectEl();
   if (select) {
     select.addEventListener('change', onSelectChange);
   }
+}
+
+function updatePrinterTypeSelect() {
+  const sel = getPrinterTypeSelect();
+  if (!sel) return;
+
+  const usbAvailable = isWebUSBAvailable();
+  const btAvailable = isWebBluetoothAvailable();
+  const saved = localStorage.getItem(PRINTER_TYPE_KEY) || 'bluetooth';
+
+  sel.innerHTML = '';
+  if (btAvailable) {
+    const optBt = document.createElement('option');
+    optBt.value = 'bluetooth';
+    optBt.textContent = 'Bluetooth (BLE)';
+    sel.appendChild(optBt);
+  }
+  if (usbAvailable) {
+    const optUsb = document.createElement('option');
+    optUsb.value = 'usb';
+    optUsb.textContent = 'USB';
+    sel.appendChild(optUsb);
+  }
+  if (!btAvailable && !usbAvailable) {
+    const optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = 'Tidak didukung';
+    sel.appendChild(optNone);
+    const btnConnect = document.getElementById('camera-settings-connect-printer');
+    if (btnConnect) btnConnect.disabled = true;
+    return;
+  }
+
+  const validSaved = (saved === 'bluetooth' && btAvailable) || (saved === 'usb' && usbAvailable);
+  sel.value = validSaved ? saved : (btAvailable ? 'bluetooth' : 'usb');
 }
 
 function closeModal() {
@@ -262,18 +310,30 @@ async function handleConnectPrinter() {
     return;
   }
 
-  // Connect
+  const printerType = getPrinterTypeSelect()?.value || 'bluetooth';
+  localStorage.setItem(PRINTER_TYPE_KEY, printerType);
+
   try {
-    if (!navigator.usb) {
-      alert('WebUSB tidak didukung di browser ini. Gunakan Chrome atau Edge untuk koneksi printer.');
-      return;
-    }
     btnEl.disabled = true;
-    await connectPrinter(0x0418);
+    if (printerType === 'usb') {
+      if (!isWebUSBAvailable()) {
+        alert('WebUSB tidak didukung. Gunakan Chrome atau Edge.');
+        return;
+      }
+      await connectPrinterUSB(0x0418);
+    } else {
+      if (!isWebBluetoothAvailable()) {
+        alert('Web Bluetooth tidak didukung. Gunakan Chrome atau Edge.');
+        return;
+      }
+      await connectPrinterBLE();
+    }
     updatePrinterStatus();
   } catch (err) {
     if (err.name === 'NotFoundError') {
       alert('Tidak ada printer yang dipilih atau printer tidak ditemukan.');
+    } else if (err.name === 'SecurityError') {
+      alert('Akses ditolak. Pastikan izin untuk USB/Bluetooth diberikan.');
     } else {
       console.error('Connect printer error:', err);
       alert('Gagal menghubungkan printer: ' + (err.message || 'Unknown error'));
@@ -309,6 +369,10 @@ export function initCameraSettings() {
     const select = getSelectEl();
     if (select?.value) {
       localStorage.setItem(STORAGE_KEY, select.value);
+    }
+    const printerTypeSel = getPrinterTypeSelect();
+    if (printerTypeSel?.value) {
+      localStorage.setItem(PRINTER_TYPE_KEY, printerTypeSel.value);
     }
     closeModal();
   });

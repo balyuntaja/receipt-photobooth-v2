@@ -65,6 +65,14 @@
             <label class="mb-2 block text-sm font-medium text-gray-700">
                 Printer
             </label>
+            <div class="mb-2">
+                <label for="camera-settings-printer-type" class="mb-1 block text-xs text-gray-500">Tipe koneksi</label>
+                <select
+                    id="camera-settings-printer-type"
+                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    {{-- Diisi dinamis: Bluetooth (BLE) dan/atau USB sesuai dukungan browser --}}
+                </select>
+            </div>
             <div class="mb-3 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
                 <span class="text-sm text-gray-600">Status:</span>
                 <span id="camera-settings-printer-status" class="text-sm font-medium text-red-600">

@@ -1,59 +1,143 @@
 /**
- * Thermal Printer Utilities using WebUSB API
+ * Thermal Printer Utilities - WebUSB and Web Bluetooth (BLE)
  * For ESC/POS compatible thermal printers (58mm)
- * Based on booth example/lib/printer.ts
  */
 
-let printer = null;
+const PRINTER_STATE = {
+  type: null,  // 'usb' | 'bluetooth'
+  device: null,
+  characteristic: null,  // BLE write characteristic
+  server: null,          // BLE GATT server
+};
+
+/** Common BLE service UUIDs for thermal printers */
+const BLE_SERVICES = [
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // HM-10 / Serial
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Custom thermal (XP-D4601B, etc)
+  '0000ffe0-0000-1000-8000-00805f9b34fb', // Common BLE serial
+];
+
+const BLE_CHUNK_SIZE = 512; // BLE MTU-friendly chunk size
 
 /**
  * Connect to thermal printer via WebUSB
- * @param {number} vendorId - USB vendor ID (default: 0x0418 for common thermal printers)
- * @returns {Promise<USBDevice>} Connected printer device
+ * @param {number} vendorId - USB vendor ID (default: 0x0418)
+ */
+export async function connectPrinterUSB(vendorId = 0x0418) {
+  if (!navigator.usb) {
+    throw new Error('WebUSB tidak didukung. Gunakan Chrome atau Edge.');
+  }
+  await disconnectPrinter();
+
+  const device = await navigator.usb.requestDevice({ filters: [{ vendorId }] });
+  await device.open();
+  await device.selectConfiguration(1);
+  await device.claimInterface(0);
+
+  PRINTER_STATE.type = 'usb';
+  PRINTER_STATE.device = device;
+  PRINTER_STATE.characteristic = null;
+  PRINTER_STATE.server = null;
+  console.log('[Printer] USB connected');
+}
+
+/**
+ * Connect to thermal printer via Web Bluetooth (BLE)
+ */
+export async function connectPrinterBLE() {
+  if (!navigator.bluetooth) {
+    throw new Error('Web Bluetooth tidak didukung. Gunakan Chrome atau Edge.');
+  }
+  await disconnectPrinter();
+
+  const device = await navigator.bluetooth.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: BLE_SERVICES,
+  });
+
+  const server = await device.gatt.connect();
+  const services = await server.getPrimaryServices();
+
+  let writeChar = null;
+  for (const svc of services) {
+    const chars = await svc.getCharacteristics();
+    for (const c of chars) {
+      if (c.properties.write || c.properties.writeWithoutResponse) {
+        writeChar = c;
+        break;
+      }
+    }
+    if (writeChar) break;
+  }
+
+  if (!writeChar) {
+    await server.disconnect();
+    throw new Error('Tidak ditemukan karakteristik untuk menulis data. Pastikan printer BLE mendukung ESC/POS.');
+  }
+
+  PRINTER_STATE.type = 'bluetooth';
+  PRINTER_STATE.device = device;
+  PRINTER_STATE.characteristic = writeChar;
+  PRINTER_STATE.server = server;
+  console.log('[Printer] BLE connected:', device.name);
+}
+
+/**
+ * Connect via USB (alias for backward compatibility)
  */
 export async function connectPrinter(vendorId = 0x0418) {
-  try {
-    if (!navigator.usb) {
-      throw new Error('WebUSB API tidak didukung di browser ini. Gunakan Chrome atau Edge.');
-    }
-
-    const device = await navigator.usb.requestDevice({
-      filters: [{ vendorId }]
-    });
-
-    await device.open();
-    await device.selectConfiguration(1);
-    await device.claimInterface(0);
-    
-    printer = device;
-    console.log('Printer connected:', device);
-    return device;
-  } catch (error) {
-    console.error('Error connecting printer:', error);
-    throw error;
-  }
+  return connectPrinterUSB(vendorId);
 }
 
 /**
  * Check if printer is connected
  */
 export function isPrinterConnected() {
-  return printer !== null;
+  return PRINTER_STATE.device !== null;
+}
+
+/**
+ * Get current printer connection type
+ * @returns {'usb'|'bluetooth'|null}
+ */
+export function getPrinterType() {
+  return PRINTER_STATE.type;
+}
+
+/**
+ * Check if WebUSB is available
+ */
+export function isWebUSBAvailable() {
+  return !!navigator.usb;
+}
+
+/**
+ * Check if Web Bluetooth is available
+ */
+export function isWebBluetoothAvailable() {
+  return !!navigator.bluetooth;
 }
 
 /**
  * Disconnect printer
  */
 export async function disconnectPrinter() {
-  if (printer) {
-    try {
-      await printer.close();
-      printer = null;
-      console.log('Printer disconnected');
-    } catch (error) {
-      console.error('Error disconnecting printer:', error);
+  if (!PRINTER_STATE.device) return;
+  try {
+    if (PRINTER_STATE.type === 'bluetooth' && PRINTER_STATE.server?.connected) {
+      PRINTER_STATE.server.disconnect();
+    } else if (PRINTER_STATE.type === 'usb' && PRINTER_STATE.device?.opened) {
+      await PRINTER_STATE.device.close();
     }
+  } catch (err) {
+    console.warn('[Printer] Disconnect error:', err);
   }
+  PRINTER_STATE.type = null;
+  PRINTER_STATE.device = null;
+  PRINTER_STATE.characteristic = null;
+  PRINTER_STATE.server = null;
+  console.log('[Printer] Disconnected');
 }
 
 /**
@@ -203,36 +287,45 @@ async function convertToESCPos(imageDataUrl, width = 680) {
 }
 
 /**
+ * Send ESC/POS data to printer (USB or BLE)
+ * @param {Uint8Array} data
+ */
+async function sendToPrinter(data) {
+  if (PRINTER_STATE.type === 'usb') {
+    await PRINTER_STATE.device.transferOut(1, data);
+    return;
+  }
+  if (PRINTER_STATE.type === 'bluetooth' && PRINTER_STATE.characteristic) {
+    for (let i = 0; i < data.length; i += BLE_CHUNK_SIZE) {
+      const chunk = data.slice(i, i + BLE_CHUNK_SIZE);
+      await PRINTER_STATE.characteristic.writeValue(chunk);
+    }
+    return;
+  }
+  throw new Error('Printer tidak terhubung atau tidak mendukung pengiriman data.');
+}
+
+/**
  * Print photostrip to thermal printer
  * @param {string} imageDataUrl - Data URL of the photostrip image
  * @param {number} quantity - Number of copies to print
  * @returns {Promise<void>} Promise that resolves when print is complete
  */
 export async function printPhotostrip(imageDataUrl, quantity = 1) {
-  if (!printer) {
+  if (!PRINTER_STATE.device) {
     throw new Error('Printer belum terhubung. Silakan hubungkan printer terlebih dahulu.');
   }
 
-  try {
-    // Convert image to ESC/POS format
-    const escposData = await convertToESCPos(imageDataUrl);
+  const escposData = await convertToESCPos(imageDataUrl);
 
-    // Print multiple copies
-    for (let i = 0; i < quantity; i++) {
-      // Send data to printer
-      await printer.transferOut(1, escposData);
-      
-      // Wait a bit between copies
-      if (i < quantity - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+  for (let i = 0; i < quantity; i++) {
+    await sendToPrinter(escposData);
+    if (i < quantity - 1) {
+      await new Promise((r) => setTimeout(r, 500));
     }
-
-    console.log(`Printed ${quantity} copy/copies successfully`);
-  } catch (error) {
-    console.error('Print error:', error);
-    throw error;
   }
+
+  console.log(`[Printer] Printed ${quantity} copy/copies`);
 }
 
 /**
