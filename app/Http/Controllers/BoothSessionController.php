@@ -104,17 +104,86 @@ class BoothSessionController extends Controller
     }
 
     /**
+     * Validate voucher and return discount info (does not consume voucher).
+     * Used by kiosk to show amount_after_discount: 100% → applyVoucher + FRAME, &lt;100% → createPayment with voucher + Snap.
+     */
+    public function validateVoucher(Request $request, BoothSession $session): JsonResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:255'],
+            'copy_count' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $copyCount = max(1, (int) ($validated['copy_count'] ?? 1));
+        $project = $session->project;
+        $setting = $project->setting;
+        $voucher = Voucher::where('code', $validated['code'])
+            ->where('user_id', $project->user_id)
+            ->first();
+        if (! $voucher) {
+            return response()->json(['valid' => false, 'message' => 'Voucher tidak ditemukan'], 422);
+        }
+        if ($voucher->expires_at && $voucher->expires_at->isPast()) {
+            return response()->json(['valid' => false, 'message' => 'Voucher sudah kadaluarsa'], 422);
+        }
+        if ((int) ($voucher->quota ?? 1) < 1) {
+            return response()->json(['valid' => false, 'message' => 'Voucher sudah habis'], 422);
+        }
+        if ($session->transaction()->exists()) {
+            return response()->json(['valid' => false, 'message' => 'Session sudah memiliki transaksi'], 422);
+        }
+
+        $totalBefore = (int) round($setting->getPriceForCopies($copyCount));
+        $discountAmount = $this->computeVoucherDiscount($voucher, $totalBefore);
+        $amountAfterDiscount = max(0, $totalBefore - $discountAmount);
+
+        return response()->json([
+            'valid' => true,
+            'total_before' => $totalBefore,
+            'discount_amount' => $discountAmount,
+            'amount_after_discount' => $amountAfterDiscount,
+        ]);
+    }
+
+    private function computeVoucherDiscount(Voucher $voucher, int $totalBefore): int
+    {
+        $type = $voucher->type ?? 'fixed';
+        $value = (int) ($voucher->value ?? 0);
+        if ($type === 'percent') {
+            return (int) round($totalBefore * min(100, max(0, $value)) / 100);
+        }
+        return min($totalBefore, $value);
+    }
+
+    /**
      * Create Midtrans Snap payment for session (QRIS etc). Creates pending transaction and returns snap_token.
-     * Accepts copy_count to determine price from copy_prices.
+     * Accepts copy_count and optional voucher_code; if voucher_code given, amount = amount_after_discount and voucher consumed on payment success.
      */
     public function createPayment(Request $request, BoothSession $session): JsonResponse
     {
         $project = $session->project;
         $setting = $project->setting;
         $copyCount = max(1, (int) ($request->input('copy_count', 1)));
+        $voucherCode = $request->input('voucher_code') ? trim((string) $request->input('voucher_code')) : null;
+
         $amount = (int) round($setting->getPriceForCopies($copyCount));
+        $voucher = null;
+        if ($voucherCode) {
+            $voucher = Voucher::where('code', $voucherCode)->where('user_id', $project->user_id)->first();
+            if (! $voucher) {
+                return response()->json(['message' => 'Voucher tidak ditemukan'], 422);
+            }
+            if ($voucher->expires_at && $voucher->expires_at->isPast()) {
+                return response()->json(['message' => 'Voucher sudah kadaluarsa'], 422);
+            }
+            if ((int) ($voucher->quota ?? 1) < 1) {
+                return response()->json(['message' => 'Voucher sudah habis'], 422);
+            }
+            $discount = $this->computeVoucherDiscount($voucher, $amount);
+            $amount = max(0, $amount - $discount);
+        }
+
         if ($amount <= 0) {
-            return response()->json(['message' => 'Session is free'], 422);
+            return response()->json(['message' => 'Session is free or fully discounted; use apply-voucher for 100% discount'], 422);
         }
         if ($session->transaction()->exists()) {
             $trx = $session->transaction;
@@ -123,14 +192,15 @@ class BoothSessionController extends Controller
             }
             if ($trx->status === TransactionStatusEnum::PENDING && $trx->order_id) {
                 try {
+                    $owner = $project->user;
                     $snapToken = app(MidtransService::class)->createTransaction([
                         'transaction_details' => [
                             'order_id' => $trx->order_id,
                             'gross_amount' => $trx->amount,
                         ],
                         'customer_details' => [
-                            'first_name' => 'Booth',
-                            'email' => 'booth@kiosk.local',
+                            'first_name' => $owner?->name ?? 'Booth',
+                            'email' => $owner?->email ?? 'booth@kiosk.local',
                         ],
                     ]);
                     return response()->json(['snap_token' => $snapToken, 'order_id' => $trx->order_id]);
@@ -148,6 +218,7 @@ class BoothSessionController extends Controller
             'order_id' => $orderId,
             'session_id' => $session->id,
             'owner_user_id' => $project->user_id,
+            'voucher_id' => $voucher?->id,
             'amount' => $amount,
             'status' => TransactionStatusEnum::PENDING,
             'type' => 'photobooth_session',
@@ -156,14 +227,15 @@ class BoothSessionController extends Controller
         $this->saveSessionCopyCount($session, $copyCount);
 
         try {
+            $owner = $project->user;
             $snapToken = app(MidtransService::class)->createTransaction([
                 'transaction_details' => [
                     'order_id' => $orderId,
                     'gross_amount' => $amount,
                 ],
                 'customer_details' => [
-                    'first_name' => 'Booth',
-                    'email' => 'booth@kiosk.local',
+                    'first_name' => $owner?->name ?? 'Booth',
+                    'email' => $owner?->email ?? 'booth@kiosk.local',
                 ],
             ]);
             return response()->json(['snap_token' => $snapToken, 'order_id' => $orderId]);
@@ -183,12 +255,11 @@ class BoothSessionController extends Controller
         ]);
         $copyCount = max(1, (int) ($validated['copy_count'] ?? 1));
         $project = $session->project;
-        $voucher = Voucher::where('code', $validated['code'])->first();
+        $voucher = Voucher::where('code', $validated['code'])
+            ->where('user_id', $project->user_id)
+            ->first();
         if (!$voucher) {
             return response()->json(['message' => 'Voucher tidak ditemukan'], 422);
-        }
-        if ($voucher->user_id !== $project->user_id) {
-            return response()->json(['message' => 'Voucher tidak valid untuk project ini'], 422);
         }
         if ($voucher->expires_at && $voucher->expires_at->isPast()) {
             return response()->json(['message' => 'Voucher sudah kadaluarsa'], 422);

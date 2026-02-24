@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
   let selectedCopyCount = Math.min(...Object.keys(copyPriceOptions).map(Number));
   const createPaymentUrl = document.body.dataset.createPaymentUrl || '';
+  const validateVoucherUrl = document.body.dataset.validateVoucherUrl || '';
   const applyVoucherUrl = document.body.dataset.applyVoucherUrl || '';
   const confirmFreeUrl = document.body.dataset.confirmFreeUrl || '';
   const midtransClientKey = document.body.dataset.midtransClientKey || '';
@@ -106,8 +107,71 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function getReviewOrderCopyLimits() {
+    const sorted = Object.keys(copyPriceOptions).map(Number).sort((a, b) => a - b);
+    return { min: Math.min(...sorted), max: Math.max(...sorted) };
+  }
+
+  function updateReviewOrderDisplay() {
+    const copyValueEl = document.getElementById('review-copy-value');
+    const copyPriceEl = document.getElementById('review-copy-price');
+    const subtotalEl = document.getElementById('review-subtotal');
+    const totalEl = document.getElementById('review-total');
+    const promoHintEl = document.getElementById('review-copy-promo');
+    const { min: minCopy } = getReviewOrderCopyLimits();
+    const price = copyPriceOptions[selectedCopyCount] ?? 0;
+    const formatRp = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID');
+    if (copyValueEl) copyValueEl.textContent = selectedCopyCount;
+    if (copyPriceEl) copyPriceEl.textContent = formatRp(price);
+    if (subtotalEl) subtotalEl.textContent = formatRp(price);
+    if (totalEl) totalEl.textContent = formatRp(price);
+    if (promoHintEl) {
+      promoHintEl.classList.toggle('hidden', selectedCopyCount < 2);
+      promoHintEl.textContent = selectedCopyCount >= 2 ? `Dapat ${selectedCopyCount} strip!` : '';
+    }
+    const minusBtn = document.getElementById('review-copy-minus');
+    if (minusBtn) minusBtn.disabled = selectedCopyCount <= minCopy;
+  }
+
+  function initReviewOrderScreen() {
+    const { min: minCopy, max: maxCopy } = getReviewOrderCopyLimits();
+    if (selectedCopyCount < minCopy || selectedCopyCount > maxCopy) {
+      selectedCopyCount = minCopy;
+    }
+    updateReviewOrderDisplay();
+    // Reset tombol "Lanjutkan ke Pembayaran" saat masuk ke layar (mis. kembali dari payment)
+    reviewToPaymentInProgress = false;
+    const reviewBtn = document.getElementById('btn-review-to-payment');
+    if (reviewBtn) {
+      reviewBtn.disabled = false;
+      reviewBtn.removeAttribute('aria-busy');
+      reviewBtn.textContent = reviewBtn.dataset.defaultLabel ?? 'Lanjutkan ke Pembayaran';
+    }
+  }
+
   const stateMachine = createStateMachine({
     IDLE: () => {},
+    REVIEW_ORDER: (state, prev) => {
+      initReviewOrderScreen();
+    },
+    PROMO_CODE: (state, prev) => {
+      const input = document.getElementById('promo-code-input');
+      const errEl = document.getElementById('promo-code-error');
+      if (errEl) {
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+      }
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      const btn = document.getElementById('btn-promo-apply');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+      }
+      promoApplyInProgress = false;
+    },
     PAYMENT: (state, prev) => {
       initPaymentCopySelector();
       const cards = document.getElementById('payment-cards');
@@ -246,30 +310,304 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const frames = initFrames(stateMachine, session);
 
-  // Start → Payment: delegation + binding ke setiap tombol (klik tombol atau wrapper-nya)
-  function goToPayment() {
-    stateMachine.setState(stateMachine.STATES.PAYMENT);
+  // Start → Tinjau Pesanan (REVIEW_ORDER), lalu lanjut ke Payment
+  function goToReviewOrder() {
+    stateMachine.setState(stateMachine.STATES.REVIEW_ORDER);
   }
   const welcomeScreen = document.getElementById('screen-welcome');
   welcomeScreen?.addEventListener('click', (e) => {
     if (e.target.closest('.welcome-start-btn') || e.target.closest('.welcome-component--button')) {
       e.preventDefault();
-      goToPayment();
+      goToReviewOrder();
     }
   });
   document.querySelectorAll('.welcome-start-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      goToPayment();
+      goToReviewOrder();
     });
   });
   const btnStartById = document.getElementById('btn-start');
   if (btnStartById && !btnStartById.classList.contains('welcome-start-btn')) {
-    btnStartById.addEventListener('click', goToPayment);
+    btnStartById.addEventListener('click', goToReviewOrder);
   }
 
-  document.getElementById('btn-payment-back')?.addEventListener('click', () => {
+  // Tinjau Pesanan: back, quantity +/- , lanjut ke pembayaran, kode promo
+  document.getElementById('btn-review-back')?.addEventListener('click', () => {
     stateMachine.setState(stateMachine.STATES.IDLE);
+  });
+  const { min: reviewMinCopy, max: reviewMaxCopy } = (() => {
+    const s = Object.keys(copyPriceOptions).map(Number).sort((a, b) => a - b);
+    return { min: Math.min(...s), max: Math.max(...s) };
+  })();
+  document.getElementById('review-copy-minus')?.addEventListener('click', () => {
+    if (selectedCopyCount <= reviewMinCopy) return;
+    selectedCopyCount = Math.max(reviewMinCopy, selectedCopyCount - 1);
+    updateReviewOrderDisplay();
+  });
+  document.getElementById('review-copy-plus')?.addEventListener('click', () => {
+    if (selectedCopyCount >= reviewMaxCopy) return;
+    selectedCopyCount = Math.min(reviewMaxCopy, selectedCopyCount + 1);
+    updateReviewOrderDisplay();
+  });
+  let reviewToPaymentInProgress = false;
+  document.getElementById('btn-review-to-payment')?.addEventListener('click', async () => {
+    if (reviewToPaymentInProgress) return;
+    reviewToPaymentInProgress = true;
+    const btn = document.getElementById('btn-review-to-payment');
+    const defaultLabel = btn?.dataset.defaultLabel ?? 'Lanjutkan ke Pembayaran';
+    const loadingLabel = btn?.dataset.loadingLabel ?? 'Memproses...';
+    if (btn) {
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+      btn.textContent = loadingLabel;
+    }
+    function resetButton() {
+      reviewToPaymentInProgress = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        btn.textContent = defaultLabel;
+      }
+    }
+    const price = copyPriceOptions[selectedCopyCount] ?? 0;
+    try {
+      if (price > 0) {
+        if (!createPaymentUrl || snapPopupOpen) {
+          resetButton();
+          return;
+        }
+        const res = await fetch(createPaymentUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({ copy_count: selectedCopyCount }),
+        });
+        const data = await res.json().catch(() => ({}));
+        const snapToken = data.snap_token;
+        if (!snapToken) {
+          console.error('No snap_token', data.message);
+          resetButton();
+          return;
+        }
+        await loadMidtransSnap();
+        if (typeof window.snap !== 'undefined' && window.snap.pay && !snapPopupOpen) {
+          snapPopupOpen = true;
+          window.snap.pay(snapToken, {
+            onSuccess: () => {
+              snapPopupOpen = false;
+              stateMachine.setState(stateMachine.STATES.FRAME);
+            },
+            onPending: () => {},
+            onError: (err) => {
+              console.error('Midtrans error', err);
+              snapPopupOpen = false;
+              resetButton();
+            },
+            onClose: () => {
+              snapPopupOpen = false;
+              resetButton();
+            },
+          });
+        } else {
+          resetButton();
+        }
+      } else {
+        if (!confirmFreeUrl) {
+          resetButton();
+          return;
+        }
+        const res = await fetch(confirmFreeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({ copy_count: selectedCopyCount }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          stateMachine.setState(stateMachine.STATES.FRAME);
+        } else {
+          resetButton();
+        }
+      }
+    } catch (err) {
+      console.error('Payment error', err);
+      resetButton();
+    }
+  });
+  document.getElementById('btn-review-promo')?.addEventListener('click', () => {
+    stateMachine.setState(stateMachine.STATES.PROMO_CODE);
+  });
+
+  // Promo code screen: Batal → REVIEW_ORDER; Terapkan → validate → 100% apply-voucher+FRAME, <100% createPayment+voucher_code+Snap
+  document.getElementById('btn-promo-cancel')?.addEventListener('click', () => {
+    stateMachine.setState(stateMachine.STATES.REVIEW_ORDER);
+  });
+  let promoApplyInProgress = false;
+  document.getElementById('btn-promo-apply')?.addEventListener('click', async () => {
+    if (promoApplyInProgress) return;
+    const input = document.getElementById('promo-code-input');
+    const errEl = document.getElementById('promo-code-error');
+    const btn = document.getElementById('btn-promo-apply');
+    const code = input?.value?.trim();
+    if (!code) {
+      if (errEl) {
+        errEl.textContent = 'Masukkan kode promo';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+    if (!validateVoucherUrl) return;
+    promoApplyInProgress = true;
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = btn.dataset.loadingLabel ?? 'Memproses...';
+    }
+    if (errEl) {
+      errEl.classList.add('hidden');
+      errEl.textContent = '';
+    }
+    try {
+      const validateRes = await fetch(validateVoucherUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ code, copy_count: selectedCopyCount }),
+      });
+      const validateData = await validateRes.json().catch(() => ({}));
+      if (!validateRes.ok || !validateData.valid) {
+        if (errEl) {
+          errEl.textContent = validateData.message || 'Voucher tidak valid';
+          errEl.classList.remove('hidden');
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+        }
+        promoApplyInProgress = false;
+        return;
+      }
+      const amountAfterDiscount = validateData.amount_after_discount ?? 0;
+      if (amountAfterDiscount <= 0) {
+        const applyRes = await fetch(applyVoucherUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({ code, copy_count: selectedCopyCount }),
+        });
+        const applyData = await applyRes.json().catch(() => ({}));
+        if (applyRes.ok && applyData.success) {
+          stateMachine.setState(stateMachine.STATES.FRAME);
+        } else {
+          if (errEl) {
+            errEl.textContent = applyData.message || 'Gagal menerapkan voucher';
+            errEl.classList.remove('hidden');
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+          }
+        }
+        promoApplyInProgress = false;
+        return;
+      }
+      const payRes = await fetch(createPaymentUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ copy_count: selectedCopyCount, voucher_code: code }),
+      });
+      const payData = await payRes.json().catch(() => ({}));
+      const snapToken = payData.snap_token;
+      if (!snapToken) {
+        if (errEl) {
+          errEl.textContent = payData.message || 'Gagal membuat pembayaran';
+          errEl.classList.remove('hidden');
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+        }
+        promoApplyInProgress = false;
+        return;
+      }
+      await loadMidtransSnap();
+      if (typeof window.snap !== 'undefined' && window.snap.pay && !snapPopupOpen) {
+        snapPopupOpen = true;
+        window.snap.pay(snapToken, {
+          onSuccess: () => {
+            snapPopupOpen = false;
+            stateMachine.setState(stateMachine.STATES.FRAME);
+          },
+          onPending: () => {},
+          onError: (err) => {
+            console.error('Midtrans error', err);
+            snapPopupOpen = false;
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+            }
+            promoApplyInProgress = false;
+          },
+          onClose: () => {
+            snapPopupOpen = false;
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+            }
+            promoApplyInProgress = false;
+          },
+        });
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+        }
+        promoApplyInProgress = false;
+      }
+    } catch (err) {
+      console.error('Promo apply error', err);
+      if (errEl) {
+        errEl.textContent = 'Gagal memproses. Coba lagi.';
+        errEl.classList.remove('hidden');
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
+      }
+      promoApplyInProgress = false;
+    }
+  });
+  document.getElementById('promo-code-input')?.addEventListener('input', () => {
+    const errEl = document.getElementById('promo-code-error');
+    if (errEl) {
+      errEl.classList.add('hidden');
+      errEl.textContent = '';
+    }
+  });
+
+  document.getElementById('btn-payment-back')?.addEventListener('click', () => {
+    stateMachine.setState(stateMachine.STATES.REVIEW_ORDER);
   });
 
   document.getElementById('btn-payment-free')?.addEventListener('click', async () => {

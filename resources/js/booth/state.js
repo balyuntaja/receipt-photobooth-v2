@@ -1,10 +1,12 @@
 /**
  * Kiosk state machine.
- * States: IDLE | PAYMENT | FRAME | CAPTURE | PREVIEW | PRINT | RESULT | RESET
+ * States: IDLE | REVIEW_ORDER | PAYMENT | FRAME | CAPTURE | PREVIEW | PRINT | RESULT | RESET
  */
 
 const STATES = {
   IDLE: 'IDLE',
+  REVIEW_ORDER: 'REVIEW_ORDER',
+  PROMO_CODE: 'PROMO_CODE',
   PAYMENT: 'PAYMENT',
   FRAME: 'FRAME',
   CAPTURE: 'CAPTURE',
@@ -24,9 +26,12 @@ export function createStateMachine(handlers = {}) {
   }
 
   function setState(newState) {
-    // Dari Welcome (IDLE) harus lewat PAYMENT dulu, tidak boleh langsung ke FRAME (backward compatibility / cache)
+    // Dari Welcome (IDLE) harus lewat Tinjau Pesanan (REVIEW_ORDER) lalu PAYMENT, tidak boleh langsung ke FRAME
     if (state === STATES.IDLE && newState === STATES.FRAME) {
-      newState = STATES.PAYMENT;
+      newState = STATES.REVIEW_ORDER;
+    }
+    if (state === STATES.IDLE && newState === STATES.PAYMENT) {
+      newState = STATES.REVIEW_ORDER;
     }
     if (state === newState) return;
     const prev = state;

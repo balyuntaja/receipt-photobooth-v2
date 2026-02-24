@@ -1,0 +1,91 @@
+/**
+ * Auth pages (login, register) – minimal layout and animations.
+ * Scoped under .auth-page to avoid affecting other pages.
+ */
+
+/* ---------------------------------------------------------------------------
+   Font
+   --------------------------------------------------------------------------- */
+.auth-page {
+    font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Keyframes
+   --------------------------------------------------------------------------- */
+@keyframes auth-fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes auth-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Animation utilities
+   --------------------------------------------------------------------------- */
+.auth-page .animate-fade-in-up {
+    opacity: 0;
+    animation: auth-fade-in-up 0.5s ease-out forwards;
+}
+
+.auth-page .animate-fade-in {
+    opacity: 0;
+    animation: auth-fade-in 0.4s ease-out forwards;
+}
+
+.auth-page .auth-animate {
+    opacity: 0;
+    animation: auth-fade-in-up 0.5s ease-out forwards;
+}
+
+.auth-page .auth-animate-fade-in {
+    opacity: 0;
+    animation: auth-fade-in 0.4s ease-out forwards;
+}
+
+/* Stagger delays */
+.auth-page .delay-1 { animation-delay: 0.05s; }
+.auth-page .delay-2 { animation-delay: 0.1s; }
+.auth-page .delay-3 { animation-delay: 0.15s; }
+.auth-page .delay-4 { animation-delay: 0.2s; }
+.auth-page .delay-5 { animation-delay: 0.25s; }
+.auth-page .delay-6 { animation-delay: 0.3s; }
+.auth-page .delay-7 { animation-delay: 0.35s; }
+
+.auth-page .delay-header {
+    animation-delay: 0.1s;
+}
+
+/* ---------------------------------------------------------------------------
+   Form controls
+   --------------------------------------------------------------------------- */
+.auth-page .auth-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(41, 37, 36, 0.2);
+}
+
+.auth-page .auth-btn {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-page .auth-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(41, 37, 36, 0.2);
+}
+
+.auth-page .auth-btn:active {
+    transform: translateY(0);
+}

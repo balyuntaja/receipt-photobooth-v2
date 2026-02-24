@@ -28,7 +28,7 @@ class MidtransPayoutService
 
     public function __construct()
     {
-        $isProduction = config('midtrans.is_production', true);
+        $isProduction = config('midtrans.is_production', false);
         $this->baseUrl = $isProduction
             ? 'https://app.midtrans.com'
             : 'https://app.sandbox.midtrans.com';

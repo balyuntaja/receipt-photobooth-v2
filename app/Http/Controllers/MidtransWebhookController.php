@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\TransactionStatusEnum;
 use App\Models\Subscription;
 use App\Models\Transaction;
+use App\Models\Voucher;
 use App\Services\SettlementService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
@@ -90,6 +91,19 @@ class MidtransWebhookController extends Controller
                     if ($grossAmount > 0) {
                         app(SettlementService::class)->recordSettlement($transaction, $grossAmount);
                         Log::info('Settlement recorded for photobooth session', ['order_id' => $orderId]);
+                    }
+                    if ($transaction->voucher_id) {
+                        $voucher = Voucher::find($transaction->voucher_id);
+                        if ($voucher) {
+                            $vid = $voucher->id;
+                            $quota = (int) ($voucher->quota ?? 1);
+                            if ($quota <= 1) {
+                                $voucher->delete();
+                            } else {
+                                $voucher->decrement('quota');
+                            }
+                            Log::info('Voucher consumed after payment', ['order_id' => $orderId, 'voucher_id' => $vid]);
+                        }
                     }
                 }
             });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BoothController;
 use App\Http\Controllers\BoothSessionController;
 use App\Http\Controllers\GalleryController;
@@ -15,16 +16,14 @@ Route::get('/', function () {
 
 Route::get('/gallery', [GalleryController::class, 'index'])->name('gallery');
 
-// Auth routes (redirect to Filament admin)
-Route::get('/login', function () {
-    return redirect('/admin/login');
-})->name('login');
-
-Route::get('/register', function () {
-    // Filament doesn't provide register by default, redirect to login
-    // If you have custom registration, change this route
-    return redirect('/admin/login');
-})->name('register');
+// Auth routes (custom login & register)
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
+    Route::post('/register', [AuthController::class, 'register']);
+});
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 
 // Kiosk routes (public, no auth)
 Route::get('/booth/{project}', [BoothController::class, 'start'])
@@ -41,6 +40,9 @@ Route::post('/booth/session/{session}/media', [BoothSessionController::class, 's
 
 Route::post('/booth/session/{session}/create-payment', [BoothSessionController::class, 'createPayment'])
     ->name('booth.session.create-payment');
+
+Route::post('/booth/session/{session}/validate-voucher', [BoothSessionController::class, 'validateVoucher'])
+    ->name('booth.session.validate-voucher');
 
 Route::post('/booth/session/{session}/apply-voucher', [BoothSessionController::class, 'applyVoucher'])
     ->name('booth.session.apply-voucher');

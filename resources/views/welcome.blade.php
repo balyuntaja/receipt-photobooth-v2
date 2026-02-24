@@ -84,19 +84,19 @@
             <h2 class="text-2xl font-bold mb-6">Cara Kerja</h2>
             <ol class="space-y-6">
                 <li class="flex gap-4">
-                    <span class="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold">1</span>
+                    <span class="shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold">1</span>
                     <div>
                         <strong>Buat Project</strong> – Daftar, buat project photobooth, atur harga, pilih frame template.
                     </div>
                 </li>
                 <li class="flex gap-4">
-                    <span class="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold">2</span>
+                    <span class="shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold">2</span>
                     <div>
                         <strong>Buka Booth</strong> – Buka URL booth di kiosk/tablet. Tamu bayar via QRIS, voucher, atau gratis.
                     </div>
                 </li>
                 <li class="flex gap-4">
-                    <span class="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold">3</span>
+                    <span class="shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold">3</span>
                     <div>
                         <strong>Ambil Foto</strong> – Pilih frame, ambil foto, preview, lalu cetak ke receipt printer atau lanjut ke layar QR untuk unduh.
                     </div>
@@ -110,7 +110,7 @@
             @auth
                 <a href="{{ url('/admin/projects') }}" class="text-stone-900 font-semibold hover:underline">Kelola project &raquo;</a>
             @else
-                <a href="{{ route('register') }}" class="inline-block rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white hover:bg-stone-800">Daftar Gratis</a>
+                <a href="{{ route('register') }}" class="inline-block rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white hover:bg-stone-800">Daftar Sekarang</a>
             @endauth
         </section>
     </main>

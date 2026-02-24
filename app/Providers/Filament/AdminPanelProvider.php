@@ -9,7 +9,7 @@ use App\Filament\Widgets\TodaySessionsWidget;
 use App\Filament\Widgets\TotalSessionsWidget;
 use App\Filament\Widgets\TotalMediaWidget;
 use App\Filament\Widgets\RecentActivityWidget;
-use Filament\Http\Middleware\Authenticate;
+use App\Http\Middleware\RedirectToCustomLogin;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -68,7 +68,7 @@ class AdminPanelProvider extends PanelProvider
                 AllowMidtransSnapCsp::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                RedirectToCustomLogin::class,
             ]);
     }
 }

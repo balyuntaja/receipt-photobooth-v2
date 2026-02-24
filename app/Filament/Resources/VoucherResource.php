@@ -12,7 +12,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 class VoucherResource extends Resource
 {
@@ -34,7 +33,12 @@ class VoucherResource extends Resource
         return $form->schema([
             Forms\Components\TextInput::make('code')
                 ->required()
-                ->unique(ignoreRecord: true),
+                ->unique(
+                    table: 'vouchers',
+                    column: 'code',
+                    modifyRuleUsing: fn ($rule, $livewire) => $rule->where('user_id', Auth::id()),
+                    ignoreRecord: true
+                ),
 
             Forms\Components\Select::make('type')
                 ->options([

@@ -18,6 +18,7 @@ class Transaction extends Model
         'order_id',
         'session_id',
         'owner_user_id',
+        'voucher_id',
         'device_id',
         'amount',
         'gross_amount',
@@ -45,6 +46,11 @@ class Transaction extends Model
     public function owner()
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function voucher()
+    {
+        return $this->belongsTo(Voucher::class);
     }
 
     public function device()

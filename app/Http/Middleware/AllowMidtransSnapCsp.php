@@ -17,13 +17,18 @@ class AllowMidtransSnapCsp
         $response = $next($request);
 
         // Midtrans Snap uses eval() - require unsafe-eval. Applied only to admin panel.
+        // In local env allow http: for img-src so http://localhost:8000/storage/* images work (CSP blocks them otherwise).
+        $imgSrc = config('app.env') === 'local'
+            ? "'self' data: https: http: blob:"
+            : "'self' data: https: blob:";
+
         $csp = implode('; ', [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com blob:",
             "frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com blob:",
             "connect-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com wss: ws: https: blob:",
             "style-src 'self' 'unsafe-inline' https:",
-            "img-src 'self' data: https: blob:",
+            "img-src {$imgSrc}",
             "font-src 'self' data: https:",
         ]);
 

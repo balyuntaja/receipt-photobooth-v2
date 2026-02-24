@@ -43,6 +43,8 @@ class UserWithDefaultsSeeder extends Seeder
 
     /**
      * Download file from URL to storage if not exists.
+     * Returns storage path (e.g. "template-frame/template-1.png") so views can use Storage::url().
+     * In development, use SEEDER_ASSET_BASE_URL so assets are fetched from a server that has them.
      */
     private function ensureFileFromUrl(string $url, string $storagePath): string
     {
@@ -51,23 +53,32 @@ class UserWithDefaultsSeeder extends Seeder
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
-        
+
         if (!file_exists($fullPath)) {
             try {
                 $response = Http::timeout(30)->get($url);
-                if ($response->successful()) {
+                if ($response->successful() && strlen($response->body()) > 0) {
                     file_put_contents($fullPath, $response->body());
                 } else {
-                    // If download fails, return URL instead
-                    return $url;
+                    $this->writePlaceholderImage($fullPath);
                 }
             } catch (\Exception $e) {
-                // If download fails, return URL instead
-                return $url;
+                $this->writePlaceholderImage($fullPath);
             }
         }
-        
+
         return $storagePath;
+    }
+
+    /**
+     * Write a minimal 1x1 PNG placeholder so storage path is always valid (views use Storage::url).
+     */
+    private function writePlaceholderImage(string $fullPath): void
+    {
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+        if ($png !== false) {
+            file_put_contents($fullPath, $png);
+        }
     }
 
     /**
@@ -75,8 +86,10 @@ class UserWithDefaultsSeeder extends Seeder
      */
     public function seedDefaultFramesAndProject(User $user): void
     {
-        $baseUrl = env('APP_URL', 'https://receipt.photomate.id');
-        
+        // Use SEEDER_ASSET_BASE_URL in development so assets are downloaded from a server that has them.
+        // In dev, APP_URL is often localhost and does not serve /template-frame/ or general_homescreen.
+        $baseUrl = rtrim(env('SEEDER_ASSET_BASE_URL', 'https://receipt.photomate.id'), '/');
+
         // Download template frames if not exists
         $template1Path = $this->ensureFileFromUrl($baseUrl . '/template-frame/template-1.png', 'template-frame/template-1.png');
         $template2Path = $this->ensureFileFromUrl($baseUrl . '/template-frame/template-2.png', 'template-frame/template-2.png');
