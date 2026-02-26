@@ -123,6 +123,76 @@ class BoothController extends Controller
     }
 
     /**
+     * Resume kiosk after payment success: same view as start() but with existing session and initialState=FRAME.
+     */
+    public function continue(BoothSession $session)
+    {
+        $project = $session->project;
+        abort_unless($project && $project->is_active, 403);
+
+        $setting = $project->setting ?? $project->setting()->create([
+            'price_per_session' => 0,
+            'copies' => 1,
+            'max_retakes' => 3,
+            'countdown_seconds' => 3,
+            'auto_print' => true,
+        ]);
+
+        $copyPriceOptions = $setting->getCopyPriceOptions();
+        $minPrice = empty($copyPriceOptions) ? 0 : min($copyPriceOptions);
+        $pricePerSession = (float) $minPrice;
+
+        $frames = $project->frames()
+            ->wherePivot('is_active', true)
+            ->where('frames.is_active', true)
+            ->get();
+
+        $framesForKiosk = $frames->map(function ($f) {
+            $tw = 1920;
+            $th = 1080;
+            $frameFileUrl = (strpos($f->frame_file, 'http') === 0)
+                ? $f->frame_file
+                : asset('storage/' . $f->frame_file);
+            $previewUrl = (strpos($f->preview_image, 'http') === 0)
+                ? $f->preview_image
+                : asset('storage/' . $f->preview_image);
+            if (strpos($f->frame_file, 'http') !== 0) {
+                $path = storage_path('app/public/' . $f->frame_file);
+                if (is_file($path)) {
+                    $size = @getimagesize($path);
+                    if ($size) {
+                        $tw = (int) $size[0];
+                        $th = (int) $size[1];
+                    }
+                }
+            }
+            return [
+                'id' => $f->id,
+                'name' => $f->name,
+                'preview' => $previewUrl,
+                'frame_file' => $frameFileUrl,
+                'photo_slots' => $f->photo_slots ?? [],
+                'template_width' => $tw,
+                'template_height' => $th,
+            ];
+        })->values();
+
+        $welcomeComponents = $project->welcomeScreenComponents()->ordered()->get();
+
+        return response()->view('booth.kiosk', [
+            'project' => $project,
+            'session' => $session,
+            'setting' => $setting,
+            'frames' => $frames,
+            'framesForKiosk' => $framesForKiosk,
+            'welcomeComponents' => $welcomeComponents,
+            'initialState' => 'FRAME',
+            'pricePerSession' => $pricePerSession,
+            'copyPriceOptions' => $copyPriceOptions,
+        ]);
+    }
+
+    /**
      * QR / softfile page: view captured photos for a session.
      * Public route (no auth) - users arrive via QR code.
      */

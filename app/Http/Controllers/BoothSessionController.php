@@ -9,7 +9,7 @@ use App\Models\Media;
 use App\Models\SessionPreference;
 use App\Models\Transaction;
 use App\Models\Voucher;
-use App\Services\MidtransService;
+use App\Services\MidtransCoreApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -155,8 +155,8 @@ class BoothSessionController extends Controller
     }
 
     /**
-     * Create Midtrans Snap payment for session (QRIS etc). Creates pending transaction and returns snap_token.
-     * Accepts copy_count and optional voucher_code; if voucher_code given, amount = amount_after_discount and voucher consumed on payment success.
+     * Create QRIS payment via Midtrans Core API. Creates pending transaction and returns redirect_url to custom pay page.
+     * Accepts copy_count and optional voucher_code; if voucher_code given, amount = amount_after_discount.
      */
     public function createPayment(Request $request, BoothSession $session): JsonResponse
     {
@@ -188,30 +188,50 @@ class BoothSessionController extends Controller
         if ($session->transaction()->exists()) {
             $trx = $session->transaction;
             if ($trx->status === TransactionStatusEnum::PAID) {
-                return response()->json(['message' => 'Already paid', 'snap_token' => null, 'order_id' => $trx->order_id], 200);
+                return response()->json([
+                    'redirect_url' => route('booth.session.pay', [$session], false) . '?order_id=' . urlencode($trx->order_id),
+                    'order_id' => $trx->order_id,
+                    'amount' => (int) $trx->amount,
+                ], 200);
             }
             if ($trx->status === TransactionStatusEnum::PENDING && $trx->order_id) {
-                try {
-                    $owner = $project->user;
-                    $snapToken = app(MidtransService::class)->createTransaction([
-                        'transaction_details' => [
-                            'order_id' => $trx->order_id,
-                            'gross_amount' => $trx->amount,
-                        ],
-                        'customer_details' => [
-                            'first_name' => $owner?->name ?? 'Booth',
-                            'email' => $owner?->email ?? 'booth@kiosk.local',
-                        ],
+                if ($trx->qr_code_url || $trx->qr_string) {
+                    $redirectUrl = url(route('booth.session.pay', [$session], false) . '?order_id=' . urlencode($trx->order_id));
+                    return response()->json([
+                        'redirect_url' => $redirectUrl,
+                        'order_id' => $trx->order_id,
+                        'amount' => (int) $trx->amount,
                     ]);
-                    return response()->json(['snap_token' => $snapToken, 'order_id' => $trx->order_id]);
-                } catch (\Throwable $e) {
-                    return response()->json(['message' => 'Payment error: ' . $e->getMessage()], 500);
                 }
+                return response()->json(['message' => 'Sesi pembayaran tertunda tanpa QR. Silakan mulai sesi baru.'], 422);
             }
         }
 
         $orderId = 'BOOTH-' . $session->id . '-' . time();
         $trxId = 'trx_' . $session->id . '_' . time();
+
+        $owner = $project->user;
+        $customerDetails = [
+            'first_name' => $owner?->name ?? 'Booth',
+            'email' => $owner?->email ?? 'booth@kiosk.local',
+        ];
+
+        try {
+            $coreApi = app(MidtransCoreApiService::class);
+            $chargeResponse = $coreApi->chargeQris($orderId, $amount, $customerDetails);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Payment error: ' . $e->getMessage()], 500);
+        }
+
+        $qrCodeUrl = null;
+        $qrString = $chargeResponse['qr_string'] ?? null;
+        $actions = $chargeResponse['actions'] ?? [];
+        foreach ($actions as $action) {
+            if (($action['name'] ?? '') === 'generate-qr-code' && ! empty($action['url'])) {
+                $qrCodeUrl = $action['url'];
+                break;
+            }
+        }
 
         Transaction::create([
             'id' => $trxId,
@@ -222,26 +242,19 @@ class BoothSessionController extends Controller
             'amount' => $amount,
             'status' => TransactionStatusEnum::PENDING,
             'type' => 'photobooth_session',
+            'qr_code_url' => $qrCodeUrl,
+            'qr_string' => $qrString,
         ]);
 
         $this->saveSessionCopyCount($session, $copyCount);
 
-        try {
-            $owner = $project->user;
-            $snapToken = app(MidtransService::class)->createTransaction([
-                'transaction_details' => [
-                    'order_id' => $orderId,
-                    'gross_amount' => $amount,
-                ],
-                'customer_details' => [
-                    'first_name' => $owner?->name ?? 'Booth',
-                    'email' => $owner?->email ?? 'booth@kiosk.local',
-                ],
-            ]);
-            return response()->json(['snap_token' => $snapToken, 'order_id' => $orderId]);
-        } catch (\Throwable $e) {
-            return response()->json(['message' => 'Payment error: ' . $e->getMessage()], 500);
-        }
+        $redirectUrl = url(route('booth.session.pay', [$session], false) . '?order_id=' . urlencode($orderId));
+
+        return response()->json([
+            'redirect_url' => $redirectUrl,
+            'order_id' => $orderId,
+            'amount' => $amount,
+        ]);
     }
 
     /**

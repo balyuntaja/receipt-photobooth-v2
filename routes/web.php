@@ -5,6 +5,7 @@ use App\Http\Controllers\BoothController;
 use App\Http\Controllers\BoothSessionController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\MidtransWebhookController;
+use App\Http\Controllers\PaymentController;
 use App\Models\Frame;
 use App\Models\Project;
 use Illuminate\Support\Facades\Auth;
@@ -49,6 +50,15 @@ Route::post('/booth/session/{session}/apply-voucher', [BoothSessionController::c
 
 Route::post('/booth/session/{session}/confirm-free', [BoothSessionController::class, 'confirmFree'])
     ->name('booth.session.confirm-free');
+
+Route::get('/booth/session/{session}/pay', [PaymentController::class, 'showPayPage'])
+    ->name('booth.session.pay');
+Route::get('/booth/session/{session}/payment-status', [PaymentController::class, 'checkStatus'])
+    ->name('booth.session.payment-status');
+Route::get('/booth/session/{session}/qris-image', [PaymentController::class, 'qrisImage'])
+    ->name('booth.session.qris-image');
+Route::get('/booth/session/{session}/continue', [BoothController::class, 'continue'])
+    ->name('booth.session.continue');
 
 Route::get('/booth/session/{session}/media', [BoothSessionController::class, 'getMedia'])
     ->name('booth.session.media.index');

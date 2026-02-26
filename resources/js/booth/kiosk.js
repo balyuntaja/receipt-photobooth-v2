@@ -47,8 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const validateVoucherUrl = document.body.dataset.validateVoucherUrl || '';
   const applyVoucherUrl = document.body.dataset.applyVoucherUrl || '';
   const confirmFreeUrl = document.body.dataset.confirmFreeUrl || '';
-  const midtransClientKey = document.body.dataset.midtransClientKey || '';
-  const midtransIsProduction = document.body.dataset.midtransIsProduction === '1';
   const csrfToken = document.body.dataset.csrf || '';
 
   function initPaymentCopySelector() {
@@ -149,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  const initialState = document.body.dataset.initialState || 'IDLE';
   const stateMachine = createStateMachine({
     IDLE: () => {},
     REVIEW_ORDER: (state, prev) => {
@@ -247,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
       selectedFrameData = null;
       stateMachine.setState(stateMachine.STATES.IDLE);
     },
-  });
+  }, initialState);
 
   function getSelectedFrameId() {
     const frameCard = document.querySelector('.frame-card.border-gray-900');
@@ -373,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const price = copyPriceOptions[selectedCopyCount] ?? 0;
     try {
       if (price > 0) {
-        if (!createPaymentUrl || snapPopupOpen) {
+        if (!createPaymentUrl) {
           resetButton();
           return;
         }
@@ -388,34 +387,13 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ copy_count: selectedCopyCount }),
         });
         const data = await res.json().catch(() => ({}));
-        const snapToken = data.snap_token;
-        if (!snapToken) {
-          console.error('No snap_token', data.message);
+        const redirectUrl = data.redirect_url;
+        if (!redirectUrl) {
+          console.error('No redirect_url', data.message);
           resetButton();
           return;
         }
-        await loadMidtransSnap();
-        if (typeof window.snap !== 'undefined' && window.snap.pay && !snapPopupOpen) {
-          snapPopupOpen = true;
-          window.snap.pay(snapToken, {
-            onSuccess: () => {
-              snapPopupOpen = false;
-              stateMachine.setState(stateMachine.STATES.FRAME);
-            },
-            onPending: () => {},
-            onError: (err) => {
-              console.error('Midtrans error', err);
-              snapPopupOpen = false;
-              resetButton();
-            },
-            onClose: () => {
-              snapPopupOpen = false;
-              resetButton();
-            },
-          });
-        } else {
-          resetButton();
-        }
+        window.location.href = redirectUrl;
       } else {
         if (!confirmFreeUrl) {
           resetButton();
@@ -538,8 +516,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ copy_count: selectedCopyCount, voucher_code: code }),
       });
       const payData = await payRes.json().catch(() => ({}));
-      const snapToken = payData.snap_token;
-      if (!snapToken) {
+      const redirectUrl = payData.redirect_url;
+      if (!redirectUrl) {
         if (errEl) {
           errEl.textContent = payData.message || 'Gagal membuat pembayaran';
           errEl.classList.remove('hidden');
@@ -551,40 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
         promoApplyInProgress = false;
         return;
       }
-      await loadMidtransSnap();
-      if (typeof window.snap !== 'undefined' && window.snap.pay && !snapPopupOpen) {
-        snapPopupOpen = true;
-        window.snap.pay(snapToken, {
-          onSuccess: () => {
-            snapPopupOpen = false;
-            stateMachine.setState(stateMachine.STATES.FRAME);
-          },
-          onPending: () => {},
-          onError: (err) => {
-            console.error('Midtrans error', err);
-            snapPopupOpen = false;
-            if (btn) {
-              btn.disabled = false;
-              btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
-            }
-            promoApplyInProgress = false;
-          },
-          onClose: () => {
-            snapPopupOpen = false;
-            if (btn) {
-              btn.disabled = false;
-              btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
-            }
-            promoApplyInProgress = false;
-          },
-        });
-      } else {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan';
-        }
-        promoApplyInProgress = false;
-      }
+      window.location.href = redirectUrl;
     } catch (err) {
       console.error('Promo apply error', err);
       if (errEl) {
@@ -679,10 +624,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  let snapPopupOpen = false; // Flag untuk mencegah multiple calls snap.pay
-
   document.getElementById('btn-payment-qris')?.addEventListener('click', async () => {
-    if (!createPaymentUrl || snapPopupOpen) return; // Jangan jalankan jika popup sudah terbuka
+    if (!createPaymentUrl) return;
     const btn = document.getElementById('btn-payment-qris');
     if (btn) btn.disabled = true;
     try {
@@ -697,68 +640,18 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ copy_count: selectedCopyCount }),
       });
       const data = await res.json().catch(() => ({}));
-      const snapToken = data.snap_token;
-      if (!snapToken) {
-        console.error('No snap_token', data.message);
+      const redirectUrl = data.redirect_url;
+      if (!redirectUrl) {
+        console.error('No redirect_url', data.message);
         if (btn) btn.disabled = false;
         return;
       }
-      await loadMidtransSnap();
-      if (typeof window.snap !== 'undefined' && window.snap.pay && !snapPopupOpen) {
-        snapPopupOpen = true; // Set flag sebelum memanggil snap.pay
-        window.snap.pay(snapToken, {
-          onSuccess: () => {
-            snapPopupOpen = false;
-            stateMachine.setState(stateMachine.STATES.FRAME);
-          },
-          onPending: () => {
-            // Popup masih terbuka, jangan reset flag
-          },
-          onError: (err) => {
-            console.error('Midtrans error', err);
-            snapPopupOpen = false;
-            if (btn) btn.disabled = false;
-          },
-          onClose: () => {
-            snapPopupOpen = false;
-            if (btn) btn.disabled = false;
-          },
-        });
-      } else {
-        console.error('Midtrans Snap not loaded or popup already open');
-        if (btn) btn.disabled = false;
-      }
+      window.location.href = redirectUrl;
     } catch (err) {
       console.error('Create payment error', err);
-      snapPopupOpen = false;
       if (btn) btn.disabled = false;
     }
   });
-
-  function loadMidtransSnap() {
-    if (window.snap && window.snap.pay) return Promise.resolve();
-    const scriptId = 'midtrans-snap-script';
-    if (document.getElementById(scriptId)) {
-      return new Promise((resolve) => {
-        const check = () => {
-          if (window.snap && window.snap.pay) return resolve();
-          setTimeout(check, 50);
-        };
-        check();
-      });
-    }
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = midtransIsProduction
-        ? 'https://app.midtrans.com/snap/snap.js'
-        : 'https://app.sandbox.midtrans.com/snap/snap.js';
-      script.setAttribute('data-client-key', midtransClientKey);
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Midtrans Snap'));
-      document.body.appendChild(script);
-    });
-  }
 
   document.getElementById('btn-capture-back')?.addEventListener('click', () => {
     camera?.stop();
@@ -1069,6 +962,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize camera settings modal
   initCameraSettings();
 
-  const initialState = document.body.dataset.initialState || 'IDLE';
   stateMachine.setState(initialState);
 });

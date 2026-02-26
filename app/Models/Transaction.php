@@ -29,6 +29,8 @@ class Transaction extends Model
         'status',
         'payment_type',
         'payload',
+        'qr_code_url',
+        'qr_string',
         'type',
     ];
 

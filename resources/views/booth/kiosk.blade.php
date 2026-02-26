@@ -7,11 +7,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#000000">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    {{-- CSP untuk Midtrans Snap popup (termasuk snap-assets CDN). Di local izinkan http: untuk img-src agar gambar storage tampil. --}}
     @php
         $cspImgSrc = config('app.env') === 'local' ? "'self' data: https: http: blob:" : "'self' data: https: blob:";
     @endphp
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://*.gtflabs.io blob: http://localhost:* http://127.0.0.1:*; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com blob:; style-src 'self' 'unsafe-inline' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://*.gtflabs.io https: http://localhost:* http://127.0.0.1:*; connect-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://*.gtflabs.io wss: ws: https: http://localhost:* http://127.0.0.1:* blob:; img-src {{ $cspImgSrc }}; font-src 'self' data: https:">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: http://localhost:* http://127.0.0.1:*; frame-src 'self' blob:; style-src 'self' 'unsafe-inline' https: http://localhost:* http://127.0.0.1:*; connect-src 'self' wss: ws: https: http://localhost:* http://127.0.0.1:* blob:; img-src {{ $cspImgSrc }}; font-src 'self' data: https:">
 
     @vite(['resources/css/booth.css', 'resources/js/booth/kiosk.js'])
 </head>
@@ -26,8 +25,6 @@
     data-validate-voucher-url="{{ route('booth.session.validate-voucher', $session) }}"
     data-apply-voucher-url="{{ route('booth.session.apply-voucher', $session) }}"
     data-confirm-free-url="{{ route('booth.session.confirm-free', $session) }}"
-    data-midtrans-client-key="{{ config('midtrans.client_key') }}"
-    data-midtrans-is-production="{{ config('midtrans.is_production') ? '1' : '0' }}"
     data-save-frame-url="{{ route('booth.session.frame', $session) }}"
     data-update-session-url="{{ route('booth.session.update', $session) }}"
     data-save-media-url="{{ route('booth.session.media', $session) }}"

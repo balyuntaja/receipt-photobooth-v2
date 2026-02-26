@@ -17,8 +17,9 @@ const STATES = {
   RESET: 'RESET',
 };
 
-export function createStateMachine(handlers = {}) {
-  let state = STATES.IDLE;
+export function createStateMachine(handlers = {}, initial = 'IDLE') {
+  const allowedInitial = STATES[initial] ? initial : 'IDLE';
+  let state = allowedInitial;
   const listeners = new Set();
 
   function getState() {
@@ -26,7 +27,8 @@ export function createStateMachine(handlers = {}) {
   }
 
   function setState(newState) {
-    // Dari Welcome (IDLE) harus lewat Tinjau Pesanan (REVIEW_ORDER) lalu PAYMENT, tidak boleh langsung ke FRAME
+    // Dari Welcome (IDLE) tidak boleh loncat langsung ke FRAME/PAYMENT — harus lewat REVIEW_ORDER.
+    // (Halaman continue setelah bayar diload dengan initialState=FRAME sehingga state sudah FRAME.)
     if (state === STATES.IDLE && newState === STATES.FRAME) {
       newState = STATES.REVIEW_ORDER;
     }
@@ -59,6 +61,11 @@ export function createStateMachine(handlers = {}) {
   }
 
   subscribe(render);
+
+  if (state !== STATES.IDLE) {
+    render();
+    if (handlers[state]) handlers[state](state, STATES.IDLE);
+  }
 
   return {
     getState,
