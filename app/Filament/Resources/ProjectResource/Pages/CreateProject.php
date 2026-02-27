@@ -2,9 +2,10 @@
 
 namespace App\Filament\Resources\ProjectResource\Pages;
 
-use App\Models\Frame;
 use App\Filament\Resources\ProjectResource;
+use App\Models\Frame;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 
 class CreateProject extends CreateRecord
@@ -13,7 +14,7 @@ class CreateProject extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['user_id'] = auth()->id();
+        $data['user_id'] = Auth::id();
 
         return $data;
     }
@@ -71,7 +72,7 @@ class CreateProject extends CreateRecord
         // Default frame using template-frame from production URL
         $template1Path = $this->ensureFileFromUrl($baseUrl . '/template-frame/template-1.png', 'template-frame/template-1.png');
         $defaultFrame = Frame::create([
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
             'name' => 'Default Frame',
             'preview_image' => $template1Path,
             'frame_file' => $template1Path,
