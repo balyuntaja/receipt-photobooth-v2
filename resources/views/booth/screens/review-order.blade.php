@@ -43,6 +43,8 @@
                 </div>
             </div>
 
+            <div id="review-payment-error" class="mt-3 hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert"></div>
+
             <button type="button" id="btn-review-promo" class="mt-4 w-full rounded-xl border border-stone-200 bg-white py-3 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-800">
                 Punya kode promo?
             </button>

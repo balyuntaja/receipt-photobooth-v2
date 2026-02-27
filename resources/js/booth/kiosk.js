@@ -137,6 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
       selectedCopyCount = minCopy;
     }
     updateReviewOrderDisplay();
+    document.getElementById('review-payment-error')?.classList.add('hidden');
+    document.getElementById('review-payment-error')?.replaceChildren();
     // Reset tombol "Lanjutkan ke Pembayaran" saat masuk ke layar (mis. kembali dari payment)
     reviewToPaymentInProgress = false;
     const reviewBtn = document.getElementById('btn-review-to-payment');
@@ -370,6 +372,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     const price = copyPriceOptions[selectedCopyCount] ?? 0;
+    const reviewErrorEl = document.getElementById('review-payment-error');
+    function showReviewError(msg) {
+      if (reviewErrorEl) {
+        reviewErrorEl.textContent = msg || 'Gagal memproses pembayaran. Coba lagi.';
+        reviewErrorEl.classList.remove('hidden');
+      }
+    }
+    function hideReviewError() {
+      if (reviewErrorEl) {
+        reviewErrorEl.textContent = '';
+        reviewErrorEl.classList.add('hidden');
+      }
+    }
+    hideReviewError();
     try {
       if (price > 0) {
         if (!createPaymentUrl) {
@@ -389,12 +405,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json().catch(() => ({}));
         if (data.snap_token) {
           console.error('Backend returned snap_token; deploy latest (Core API only).');
+          showReviewError('Backend masih mengembalikan Snap. Pastikan deploy terbaru.');
           resetButton();
           return;
         }
         const redirectUrl = data.redirect_url;
         if (!redirectUrl) {
-          console.error('No redirect_url', data.message);
+          const msg = data.message || (res.ok ? '' : `Error ${res.status}`);
+          console.error('No redirect_url', msg);
+          showReviewError(msg || 'Tidak ada redirect. Coba mulai sesi baru.');
+          resetButton();
+          return;
+        }
+        if (!res.ok) {
+          showReviewError(data.message || `Error ${res.status}`);
           resetButton();
           return;
         }
@@ -423,6 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       console.error('Payment error', err);
+      showReviewError(err.message || 'Koneksi gagal. Periksa jaringan dan coba lagi.');
       resetButton();
     }
   });

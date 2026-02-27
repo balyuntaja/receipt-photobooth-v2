@@ -12,6 +12,7 @@ use App\Models\Voucher;
 use App\Services\MidtransCoreApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -160,6 +161,8 @@ class BoothSessionController extends Controller
      */
     public function createPayment(Request $request, BoothSession $session): JsonResponse
     {
+        Log::info('createPayment: start', ['session_id' => $session->id, 'copy_count' => $request->input('copy_count')]);
+
         $project = $session->project;
         $setting = $project->setting;
         $copyCount = max(1, (int) ($request->input('copy_count', 1)));
@@ -203,7 +206,9 @@ class BoothSessionController extends Controller
                         'amount' => (int) $trx->amount,
                     ]);
                 }
-                return response()->json(['message' => 'Sesi pembayaran tertunda tanpa QR. Silakan mulai sesi baru.'], 422);
+                // Transaksi PENDING lama tanpa QR (mis. dari Snap atau charge gagal): hapus lalu buat charge baru
+                Log::info('createPayment: removing stale PENDING transaction without QR', ['session_id' => $session->id, 'order_id' => $trx->order_id]);
+                $trx->delete();
             }
         }
 
@@ -220,6 +225,7 @@ class BoothSessionController extends Controller
             $coreApi = app(MidtransCoreApiService::class);
             $chargeResponse = $coreApi->chargeQris($orderId, $amount, $customerDetails);
         } catch (\Throwable $e) {
+            Log::error('createPayment: Midtrans charge failed', ['session_id' => $session->id, 'order_id' => $orderId, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json(['message' => 'Payment error: ' . $e->getMessage()], 500);
         }
 
@@ -249,6 +255,8 @@ class BoothSessionController extends Controller
         $this->saveSessionCopyCount($session, $copyCount);
 
         $redirectUrl = url(route('booth.session.pay', [$session], false) . '?order_id=' . urlencode($orderId));
+
+        Log::info('createPayment: success', ['session_id' => $session->id, 'order_id' => $orderId]);
 
         return response()->json([
             'redirect_url' => $redirectUrl,
