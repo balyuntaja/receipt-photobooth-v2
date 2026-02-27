@@ -232,11 +232,24 @@ class BoothSessionController extends Controller
         $qrCodeUrl = null;
         $qrString = $chargeResponse['qr_string'] ?? null;
         $actions = $chargeResponse['actions'] ?? [];
+
         foreach ($actions as $action) {
-            if (($action['name'] ?? '') === 'generate-qr-code' && ! empty($action['url'])) {
-                $qrCodeUrl = $action['url'];
+            $name = $action['name'] ?? '';
+            $url = $action['url'] ?? '';
+
+            // Midtrans can return either "generate-qr-code" or "generate-qr-code-v2"
+            if (in_array($name, ['generate-qr-code', 'generate-qr-code-v2'], true) && ! empty($url)) {
+                $qrCodeUrl = $url;
                 break;
             }
+        }
+
+        if (! $qrCodeUrl && ! $qrString) {
+            Log::warning('createPayment: Midtrans response without QR data', [
+                'session_id' => $session->id,
+                'order_id' => $orderId,
+                'charge_response' => $chargeResponse,
+            ]);
         }
 
         Transaction::create([
