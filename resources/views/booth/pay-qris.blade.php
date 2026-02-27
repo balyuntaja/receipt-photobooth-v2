@@ -63,10 +63,14 @@
         </div>
     </div>
 
+    <script type="application/json" id="pay-qris-config">
+    {!! json_encode(['paymentStatusUrl' => $paymentStatusUrl, 'continueUrl' => $continueUrl]) !!}
+    </script>
     <script>
         (function () {
-            const paymentStatusUrl = @json($paymentStatusUrl);
-            const continueUrl = @json($continueUrl);
+            const config = JSON.parse(document.getElementById('pay-qris-config').textContent);
+            const paymentStatusUrl = config.paymentStatusUrl;
+            const continueUrl = config.continueUrl;
             const POLL_INTERVAL_MS = 3000;
 
             let pollTimer = null;
