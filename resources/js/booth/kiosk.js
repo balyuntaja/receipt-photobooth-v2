@@ -387,6 +387,11 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ copy_count: selectedCopyCount }),
         });
         const data = await res.json().catch(() => ({}));
+        if (data.snap_token) {
+          console.error('Backend returned snap_token; deploy latest (Core API only).');
+          resetButton();
+          return;
+        }
         const redirectUrl = data.redirect_url;
         if (!redirectUrl) {
           console.error('No redirect_url', data.message);
@@ -425,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
     stateMachine.setState(stateMachine.STATES.PROMO_CODE);
   });
 
-  // Promo code screen: Batal → REVIEW_ORDER; Terapkan → validate → 100% apply-voucher+FRAME, <100% createPayment+voucher_code+Snap
+  // Promo code screen: Batal → REVIEW_ORDER; Terapkan → validate → 100% apply-voucher+FRAME, <100% createPayment (Core API) + redirect
   document.getElementById('btn-promo-cancel')?.addEventListener('click', () => {
     stateMachine.setState(stateMachine.STATES.REVIEW_ORDER);
   });
@@ -516,6 +521,12 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ copy_count: selectedCopyCount, voucher_code: code }),
       });
       const payData = await payRes.json().catch(() => ({}));
+      if (payData.snap_token) {
+        console.error('Backend returned snap_token; deploy latest (Core API only).');
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.defaultLabel ?? 'Terapkan'; }
+        promoApplyInProgress = false;
+        return;
+      }
       const redirectUrl = payData.redirect_url;
       if (!redirectUrl) {
         if (errEl) {
@@ -640,6 +651,11 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ copy_count: selectedCopyCount }),
       });
       const data = await res.json().catch(() => ({}));
+      if (data.snap_token) {
+        console.error('Backend returned snap_token; deploy latest (Core API only).');
+        if (btn) btn.disabled = false;
+        return;
+      }
       const redirectUrl = data.redirect_url;
       if (!redirectUrl) {
         console.error('No redirect_url', data.message);

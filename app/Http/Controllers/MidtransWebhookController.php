@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\TransactionStatusEnum;
-use App\Models\Subscription;
 use App\Models\Transaction;
 use App\Models\Voucher;
 use App\Services\SettlementService;
@@ -78,12 +77,6 @@ class MidtransWebhookController extends Controller
                 $transaction->payload = $rawPayload;
                 $transaction->save();
 
-                // Side effects setelah save (idempotent guard sudah jalan di atas)
-                if ($transaction->type === 'subscription' && $transaction->status === TransactionStatusEnum::PAID) {
-                    $this->activateSubscription($transaction);
-                    Log::info('Subscription activated from payment', ['order_id' => $orderId]);
-                }
-
                 // Manual Monthly Settlement: record gross/platform_fee/owner_amount, aggregate to monthly_earnings.
                 // NO wallet credit (instant withdraw disabled). Payout is manual by admin.
                 if ($transaction->type === 'photobooth_session' && $transaction->status === TransactionStatusEnum::PAID) {
@@ -117,28 +110,5 @@ class MidtransWebhookController extends Controller
         }
 
         return response()->json(['message' => 'ok']);
-    }
-
-    protected function activateSubscription(Transaction $transaction): void
-    {
-        $userId = $transaction->owner_user_id;
-        if (! $userId) {
-            return;
-        }
-
-        $startedAt = now();
-        $endsAt = $startedAt->copy()->addMonth();
-
-        Subscription::create([
-            'user_id' => $userId,
-            'package_name' => 'Starter',
-            'period' => 'Monthly',
-            'status' => 'aktif',
-            'started_at' => $startedAt,
-            'ends_at' => $endsAt,
-            'token' => \Illuminate\Support\Str::random(32),
-            'device_info' => null,
-            'source' => 'payment',
-        ]);
     }
 }

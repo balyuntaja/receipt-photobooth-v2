@@ -36,7 +36,7 @@
 
         <div class="flex flex-col gap-3">
             <a
-                href="{{ $langgananUrl ?? url('/admin/langganan') }}"
+                href="{{ $langgananUrl ?? url('/admin') }}"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-blue-700"

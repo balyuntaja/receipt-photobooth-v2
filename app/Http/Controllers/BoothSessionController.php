@@ -105,7 +105,7 @@ class BoothSessionController extends Controller
 
     /**
      * Validate voucher and return discount info (does not consume voucher).
-     * Used by kiosk to show amount_after_discount: 100% → applyVoucher + FRAME, &lt;100% → createPayment with voucher + Snap.
+     * Used by kiosk: 100% discount → applyVoucher + FRAME; &lt;100% → createPayment (Core API QRIS) with voucher.
      */
     public function validateVoucher(Request $request, BoothSession $session): JsonResponse
     {

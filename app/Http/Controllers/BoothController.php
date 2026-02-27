@@ -102,7 +102,7 @@ class BoothController extends Controller
             ->ordered()
             ->get();
 
-        // 7️⃣ Return kiosk view with all data for JS + CSP untuk Midtrans Snap
+        // 7️⃣ Return kiosk view with all data for JS (Core API QRIS, no Snap)
         $response = response()->view('booth.kiosk', [
             'project' => $project,
             'session' => $session,
@@ -114,10 +114,6 @@ class BoothController extends Controller
             'pricePerSession' => $pricePerSession,
             'copyPriceOptions' => $copyPriceOptions,
         ]);
-
-        // CSP untuk Midtrans Snap (hanya saat popup dibuka, tidak perlu di halaman kiosk)
-        // CSP akan ditambahkan via meta tag di kiosk.blade.php jika diperlukan, atau via middleware
-        // Untuk sementara tidak set CSP di sini agar layout tidak rusak
 
         return $response;
     }
