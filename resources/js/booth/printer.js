@@ -655,3 +655,24 @@ export async function printPhotostrip(imageDataUrl, qty = 1) {
 
   console.log('Print done');
 }
+
+/**
+ * Check WebUSB support
+ */
+export function isWebUSBAvailable() {
+  return typeof navigator !== 'undefined' && !!navigator.usb;
+}
+
+/**
+ * Check Web Bluetooth support
+ */
+export function isWebBluetoothAvailable() {
+  return typeof navigator !== 'undefined' && !!navigator.bluetooth;
+}
+
+/**
+ * Check if printer connected
+ */
+export function isPrinterConnected() {
+  return PRINTER_STATE.device !== null;
+}
